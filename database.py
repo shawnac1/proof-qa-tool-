@@ -324,10 +324,10 @@ class LearningDatabase:
     def compute_image_hash(self, image_bytes: bytes) -> str:
         """Compute a perceptual hash of the image for similarity matching"""
         import hashlib
-        from PIL import Image
         import io
 
         try:
+            from PIL import Image
             # Open image and resize to small standard size for hashing
             img = Image.open(io.BytesIO(image_bytes))
             img = img.convert('L')  # Convert to grayscale
@@ -342,7 +342,7 @@ class LearningDatabase:
             hash_int = int(bits, 2)
             return format(hash_int, '064x')
         except Exception:
-            # Fallback to simple MD5 hash
+            # Fallback to simple MD5 hash if PIL not available or image can't be processed
             return hashlib.md5(image_bytes).hexdigest()
 
     def save_correction(self, image_bytes: bytes, original_filename: str,
@@ -473,4 +473,15 @@ class LearningDatabase:
 
 
 # Global learning database instance
-learning_db = LearningDatabase()
+try:
+    learning_db = LearningDatabase()
+except Exception as e:
+    print(f"Warning: Could not initialize learning database: {e}")
+    # Create a dummy learning_db that does nothing but doesn't crash
+    class DummyLearningDB:
+        def save_correction(self, *args, **kwargs): return False
+        def get_learned_room(self, *args, **kwargs): return None
+        def get_accuracy_stats(self, *args, **kwargs): return {}
+        def get_total_corrections(self, *args, **kwargs): return 0
+        def compute_image_hash(self, *args, **kwargs): return ""
+    learning_db = DummyLearningDB()
