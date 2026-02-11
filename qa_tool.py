@@ -1793,7 +1793,7 @@ def render_footer():
                 <div style="font-size: 11px; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em;">Time Saved</div>
             </div>
         </div>
-        <p style="text-align: center; font-size: 11px; color: #71717a !important; letter-spacing: 0.05em;">Proof by Aerial Canvas · Beta v1.6</p>
+        <p style="text-align: center; font-size: 11px; color: #71717a !important; letter-spacing: 0.05em;">Proof by Aerial Canvas · Beta v1.7</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -5904,27 +5904,23 @@ def display_video_review_interface(report: QAReport, video_path: str = None, sho
             cat_info = category_colors[category]
             timestamp = format_timestamp_short(issue.timestamp_start)
 
-            # Severity styling
+            # Severity styling - solid backgrounds with black text for readability
             if issue.status == 'fail':
-                sev_bg = "rgba(239, 68, 68, 0.08)"
-                sev_border = "rgba(239, 68, 68, 0.25)"
-                sev_text = "#ef4444"
+                sev_bg = "#ef4444"
                 sev_label = "FAIL"
             else:
-                sev_bg = "rgba(245, 158, 11, 0.08)"
-                sev_border = "rgba(245, 158, 11, 0.25)"
-                sev_text = "#f59e0b"
+                sev_bg = "#f59e0b"
                 sev_label = "WARNING"
 
             st.markdown(f"""
             <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px;
                         padding: 16px 20px; margin-top: 16px;">
                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #1d1d1f;">
-                    <span style="background: {cat_info['bg']}; color: #fff; padding: 4px 10px; border-radius: 6px;
-                                 font-size: 11px; font-weight: 600;">{cat_info['label'].upper()}</span>
-                    <span style="background: {sev_bg}; color: {sev_text}; padding: 4px 10px; border-radius: 6px;
-                                 font-size: 11px; font-weight: 600; border: 1px solid {sev_border};">{sev_label}</span>
-                    <span style="color: #52525b; font-size: 11px; margin-left: auto;">Issue {selected_idx + 1} of {len(timeline_issues)}</span>
+                    <span style="background: {cat_info['bg']}; color: #000000 !important; padding: 4px 10px; border-radius: 6px;
+                                 font-size: 11px; font-weight: 700;">{cat_info['label'].upper()}</span>
+                    <span style="background: {sev_bg}; color: #000000 !important; padding: 4px 10px; border-radius: 6px;
+                                 font-size: 11px; font-weight: 700;">{sev_label}</span>
+                    <span style="color: #71717a; font-size: 11px; margin-left: auto;">Issue {selected_idx + 1} of {len(timeline_issues)}</span>
                 </div>
                 <div style="color: #fff; font-weight: 600; font-size: 15px; margin-bottom: 8px;">{issue.check_name}</div>
                 <div style="color: #a1a1aa; font-size: 13px; line-height: 1.6; margin-bottom: 12px;">{issue.message}</div>
@@ -6003,8 +5999,7 @@ def display_video_review_interface(report: QAReport, video_path: str = None, sho
         # Build clean issue cards
         for idx, issue in enumerate(general_issues):
             severity_color = "#ef4444" if issue.status == 'fail' else "#f59e0b"
-            severity_label = "FAIL" if issue.status == 'fail' else "WARN"
-            severity_bg = "rgba(239, 68, 68, 0.08)" if issue.status == 'fail' else "rgba(245, 158, 11, 0.08)"
+            severity_label = "FAIL" if issue.status == 'fail' else "WARNING"
 
             # Clean message display
             short_msg = issue.message[:100] + "..." if len(issue.message) > 100 else issue.message
@@ -6013,8 +6008,8 @@ def display_video_review_interface(report: QAReport, video_path: str = None, sho
             st.markdown(f"""
             <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 8px; padding: 14px 16px; margin-top: 8px;">
                 <div style="display: flex; align-items: flex-start; gap: 12px;">
-                    <span style="background: {severity_color}; color: #000; font-size: 10px; font-weight: 700;
-                                 padding: 3px 8px; border-radius: 4px; flex-shrink: 0;">{severity_label}</span>
+                    <span style="background: {severity_color}; color: #000000 !important; font-size: 11px; font-weight: 700;
+                                 padding: 4px 10px; border-radius: 4px; flex-shrink: 0; letter-spacing: 0.02em;">{severity_label}</span>
                     <div style="flex: 1; min-width: 0;">
                         <div style="color: #fff; font-weight: 600; font-size: 13px; margin-bottom: 4px;">{issue.check_name}</div>
                         <div style="color: #a1a1aa; font-size: 12px; line-height: 1.4;">{short_msg}</div>

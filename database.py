@@ -318,6 +318,18 @@ class LearningDatabase:
             )
         ''')
 
+        # Video detection feedback - for log footage and other video checks
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS video_detection_feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                check_type TEXT NOT NULL,
+                contrast REAL,
+                saturation REAL,
+                is_correct BOOLEAN NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
         conn.commit()
         conn.close()
 
@@ -471,6 +483,78 @@ class LearningDatabase:
         conn.close()
         return count
 
+    # Video detection feedback methods
+    def save_video_detection_feedback(self, check_type: str, contrast: float,
+                                       saturation: float, is_correct: bool) -> bool:
+        """Save feedback on a video detection (e.g., log footage)"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO video_detection_feedback (check_type, contrast, saturation, is_correct)
+            VALUES (?, ?, ?, ?)
+        ''', (check_type, contrast, saturation, is_correct))
+        conn.commit()
+        conn.close()
+        return True
+
+    def get_log_detection_thresholds(self) -> Dict:
+        """Get adjusted thresholds based on user feedback"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        # Get average contrast/saturation for false positives
+        cursor.execute('''
+            SELECT AVG(contrast), AVG(saturation), COUNT(*)
+            FROM video_detection_feedback
+            WHERE check_type = 'log_footage' AND is_correct = 0
+        ''')
+        false_pos = cursor.fetchone()
+
+        # Get average for true positives
+        cursor.execute('''
+            SELECT AVG(contrast), AVG(saturation), COUNT(*)
+            FROM video_detection_feedback
+            WHERE check_type = 'log_footage' AND is_correct = 1
+        ''')
+        true_pos = cursor.fetchone()
+
+        conn.close()
+
+        # Default thresholds
+        result = {'contrast': 38, 'saturation': 30, 'feedback_count': 0}
+
+        # Adjust if we have enough feedback
+        total_feedback = (false_pos[2] or 0) + (true_pos[2] or 0)
+        result['feedback_count'] = total_feedback
+
+        if false_pos[2] and false_pos[2] >= 3 and false_pos[0]:
+            # Lower thresholds if we have false positives (be more strict)
+            result['contrast'] = min(result['contrast'], false_pos[0] - 5)
+            result['saturation'] = min(result['saturation'], false_pos[1] - 5)
+
+        return result
+
+    def get_video_feedback_stats(self) -> Dict:
+        """Get statistics on video detection feedback"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT check_type,
+                   SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct,
+                   SUM(CASE WHEN is_correct = 0 THEN 1 ELSE 0 END) as false_positive,
+                   COUNT(*) as total
+            FROM video_detection_feedback
+            GROUP BY check_type
+        ''')
+        rows = cursor.fetchall()
+        conn.close()
+
+        return {row[0]: {
+            'correct': row[1],
+            'false_positive': row[2],
+            'total': row[3]
+        } for row in rows}
+
 
 # Global learning database instance
 try:
@@ -484,4 +568,7 @@ except Exception as e:
         def get_accuracy_stats(self, *args, **kwargs): return {}
         def get_total_corrections(self, *args, **kwargs): return 0
         def compute_image_hash(self, *args, **kwargs): return ""
+        def save_video_detection_feedback(self, *args, **kwargs): return False
+        def get_log_detection_thresholds(self, *args, **kwargs): return {'contrast': 38, 'saturation': 30, 'feedback_count': 0}
+        def get_video_feedback_stats(self, *args, **kwargs): return {}
     learning_db = DummyLearningDB()
