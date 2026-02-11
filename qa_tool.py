@@ -180,8 +180,22 @@ def organize_photos_in_dropbox(dbx, source_shared_link, sorted_photos, progress_
         if progress_callback:
             progress_callback(0, len(sorted_photos), "Connecting to Dropbox...")
 
-        link_meta = dbx.sharing_get_shared_link_metadata(source_shared_link)
-        source_path = link_meta.path_lower
+        # Clean up the shared link URL (remove query params)
+        clean_link = source_shared_link.split('?')[0]
+        if not clean_link.startswith('https://'):
+            clean_link = source_shared_link
+
+        link_meta = dbx.sharing_get_shared_link_metadata(clean_link)
+
+        # Try to get the path - might be path_lower or path_display
+        source_path = link_meta.path_lower or getattr(link_meta, 'path_display', None)
+
+        if not source_path:
+            # If still no path, try to extract from the link name
+            if hasattr(link_meta, 'name') and link_meta.name:
+                raise Exception(f"Could not determine folder path. Shared link points to: {link_meta.name}. Please use a direct folder link.")
+            else:
+                raise Exception("Could not determine folder path from shared link. Please make sure you're sharing a folder, not individual files.")
 
         # Create destination folder (sibling to source with _Sorted suffix)
         parent_path = os.path.dirname(source_path.rstrip('/'))
@@ -1779,7 +1793,7 @@ def render_footer():
                 <div style="font-size: 11px; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em;">Time Saved</div>
             </div>
         </div>
-        <p style="text-align: center; font-size: 11px; color: #71717a !important; letter-spacing: 0.05em;">Proof by Aerial Canvas · Beta v1.2</p>
+        <p style="text-align: center; font-size: 11px; color: #71717a !important; letter-spacing: 0.05em;">Proof by Aerial Canvas · Beta v1.3</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -6488,157 +6502,336 @@ def display_report(report: QAReport, show_feedback: bool = True):
 # AUTO SORT - Footage Organization & XML Export
 # ============================================================================
 
-# Room type definitions with visual feature keywords
+# Room type definitions with enhanced visual feature keywords from AI Classification Guide
 ROOM_TYPES = {
     "exterior_front": {
         "name": "Front Exterior",
         "icon": "room_exterior",
-        "keywords": ["front", "exterior", "curb", "driveway", "facade", "entrance"],
-        "features": ["sky", "roof", "windows", "door", "garage_door", "landscaping"]
+        "keywords": ["front", "exterior", "curb", "facade", "entrance", "front_of_house"],
+        "features": ["front_door", "house_numbers", "address", "windows", "roofline", "porch", "stoop",
+                     "columns", "landscaping", "walkway", "outdoor_lighting", "garage_door", "fence", "gate"],
+        "primary_identifier": "Front door + address numbers + street-facing facade"
     },
     "exterior_rear": {
         "name": "Rear Exterior",
         "icon": "room_exterior_rear",
-        "keywords": ["rear", "back_exterior", "backside"],
-        "features": ["sky", "roof", "back_windows", "deck", "patio_door", "back_of_house"]
-    },
-    "entry": {
-        "name": "Entryway",
-        "icon": "room_entry",
-        "keywords": ["entry", "foyer", "front", "welcome"],
-        "features": ["door", "narrow_space", "hallway", "stairs_visible"]
-    },
-    "living_room": {
-        "name": "Living Room",
-        "icon": "room_living",
-        "keywords": ["living", "great", "family", "main"],
-        "features": ["sofa", "couch", "tv", "fireplace", "large_windows", "open_space"]
-    },
-    "kitchen": {
-        "name": "Kitchen",
-        "icon": "room_kitchen",
-        "keywords": ["kitchen", "cook"],
-        "features": ["cabinets", "countertop", "appliances", "island", "sink", "stove"]
-    },
-    "dining": {
-        "name": "Dining Room",
-        "icon": "room_dining",
-        "keywords": ["dining", "eat"],
-        "features": ["table", "chairs", "chandelier", "formal"]
-    },
-    "primary_bedroom": {
-        "name": "Primary Bedroom",
-        "icon": "room_primary_bed",
-        "keywords": ["master", "primary", "main_bed"],
-        "features": ["large_bed", "ensuite_visible", "spacious"]
-    },
-    "bedroom": {
-        "name": "Bedroom",
-        "icon": "room_bedroom",
-        "keywords": ["bed", "guest", "room"],
-        "features": ["bed", "dresser", "closet", "window"]
-    },
-    "bathroom": {
-        "name": "Bathroom",
-        "icon": "room_bathroom",
-        "keywords": ["bath", "powder", "half"],
-        "features": ["toilet", "sink", "vanity", "shower", "tub", "tile", "mirror"]
-    },
-    "office": {
-        "name": "Office",
-        "icon": "room_office",
-        "keywords": ["office", "study", "den", "work"],
-        "features": ["desk", "shelves", "books", "computer"]
-    },
-    "front_yard": {
-        "name": "Front Yard",
-        "icon": "room_yard",
-        "keywords": ["front_yard", "front_lawn", "front_landscape"],
-        "features": ["grass", "trees", "plants", "fence", "sky", "walkway"]
-    },
-    "backyard": {
-        "name": "Backyard",
-        "icon": "room_backyard",
-        "keywords": ["back", "backyard", "rear_yard"],
-        "features": ["grass", "fence", "patio", "outdoor_furniture", "sky", "trees"]
-    },
-    "pool": {
-        "name": "Pool",
-        "icon": "room_pool",
-        "keywords": ["pool", "swim", "spa", "hot_tub"],
-        "features": ["pool_water", "deck", "lounge", "blue_water", "outdoor"]
-    },
-    "yard": {
-        "name": "Yard",
-        "icon": "room_yard",
-        "keywords": ["yard", "garden", "landscape"],
-        "features": ["grass", "trees", "plants", "fence", "sky"]
-    },
-    "garage": {
-        "name": "Garage",
-        "icon": "room_garage",
-        "keywords": ["garage", "car", "parking"],
-        "features": ["garage_door", "concrete", "storage", "car"]
-    },
-    "laundry": {
-        "name": "Laundry Room",
-        "icon": "room_laundry",
-        "keywords": ["laundry", "washer", "dryer", "utility"],
-        "features": ["washer", "dryer", "laundry_sink", "cabinets", "utility"]
-    },
-    "adu": {
-        "name": "Guest House",
-        "icon": "room_adu",
-        "keywords": ["adu", "guest", "casita", "in-law", "accessory", "cottage", "unit"],
-        "features": ["small_kitchen", "separate_entrance", "compact", "studio"]
-    },
-    "drone": {
-        "name": "Drone Aerial",
-        "icon": "room_drone",
-        "keywords": ["drone", "aerial", "dji", "overhead"],
-        "features": ["roof_visible", "birds_eye", "neighborhood", "sky_dominant"]
-    },
-    "detail": {
-        "name": "Detail Shot",
-        "icon": "room_detail",
-        "keywords": ["detail", "close", "feature"],
-        "features": ["close_up", "shallow_dof", "texture", "hardware"]
-    },
-    "sunroom": {
-        "name": "Sunroom",
-        "icon": "room_sunroom",
-        "keywords": ["sunroom", "sun_room", "solarium", "conservatory", "florida_room"],
-        "features": ["large_windows", "natural_light", "plants", "wicker", "bright"]
-    },
-    "side_yard": {
-        "name": "Side Yard",
-        "icon": "room_yard",
-        "keywords": ["side_yard", "side", "narrow_yard", "passage"],
-        "features": ["narrow", "fence", "gate", "pathway", "plants"]
-    },
-    "garden": {
-        "name": "Garden",
-        "icon": "room_garden",
-        "keywords": ["garden", "flowers", "vegetable", "planter"],
-        "features": ["plants", "flowers", "raised_beds", "soil", "greenery"]
-    },
-    "shed": {
-        "name": "Shed",
-        "icon": "room_shed",
-        "keywords": ["shed", "storage", "outbuilding", "tool"],
-        "features": ["small_structure", "storage", "tools", "outdoor"]
+        "keywords": ["rear", "back_exterior", "backside", "back_of_house"],
+        "features": ["back_windows", "deck", "patio_door", "sliding_door", "back_porch"],
+        "primary_identifier": "Back of house with rear entry doors"
     },
     "driveway": {
         "name": "Driveway",
         "icon": "room_driveway",
         "keywords": ["driveway", "drive", "parking", "carport"],
-        "features": ["pavement", "concrete", "asphalt", "cars", "garage_approach"]
+        "features": ["paved_surface", "concrete", "asphalt", "pavers", "gravel", "curb_cut", "expansion_joints",
+                     "basketball_hoop", "slope", "gates", "bollard_lights"],
+        "primary_identifier": "Wide paved surface from street to garage"
+    },
+    "garage": {
+        "name": "Garage",
+        "icon": "room_garage",
+        "keywords": ["garage", "car", "parking"],
+        "features": ["overhead_door", "garage_door", "concrete_floor", "epoxy_floor", "exposed_ceiling",
+                     "water_heater", "furnace", "electrical_panel", "workbench", "storage_shelving",
+                     "garage_door_opener", "washer_dryer"],
+        "primary_identifier": "Large overhead door + concrete floor"
+    },
+    "entry": {
+        "name": "Entryway / Foyer",
+        "icon": "room_entry",
+        "keywords": ["entry", "foyer", "front", "welcome", "vestibule"],
+        "features": ["front_door_interior", "sidelights", "transom", "tile_flooring", "hardwood", "marble",
+                     "coat_closet", "hooks", "console_table", "entry_bench", "mirror", "chandelier",
+                     "staircase", "stairway", "door_mat", "area_rug"],
+        "primary_identifier": "Front door interior side + transitional flooring"
+    },
+    "living_room": {
+        "name": "Living Room",
+        "icon": "room_living",
+        "keywords": ["living", "great", "family", "main", "great_room"],
+        "features": ["sofa", "couch", "armchairs", "loveseat", "ottoman", "coffee_table", "tv",
+                     "entertainment_center", "media_console", "fireplace", "mantel", "large_windows",
+                     "area_rug", "side_tables", "end_tables", "lamps", "bookshelves", "built_in_cabinetry",
+                     "throw_pillows", "ceiling_fan"],
+        "primary_identifier": "Sofa + coffee table + TV/fireplace focal point"
+    },
+    "dining": {
+        "name": "Dining Room",
+        "icon": "room_dining",
+        "keywords": ["dining", "eat", "formal_dining"],
+        "features": ["dining_table", "dining_chairs", "chandelier", "pendant_light", "buffet", "sideboard",
+                     "hutch", "china_cabinet", "placemats", "centerpiece", "wainscoting", "chair_rail",
+                     "french_doors", "crown_molding"],
+        "primary_identifier": "Dining table + chairs + overhead chandelier"
+    },
+    "kitchen": {
+        "name": "Kitchen",
+        "icon": "room_kitchen",
+        "keywords": ["kitchen", "cook", "galley"],
+        "features": ["cabinetry", "upper_cabinets", "lower_cabinets", "countertops", "granite", "quartz",
+                     "marble", "butcher_block", "sink", "faucet", "stove", "range", "hood", "vent",
+                     "refrigerator", "dishwasher", "microwave", "island", "peninsula", "bar_stools",
+                     "backsplash", "tile", "pantry", "pendant_lights", "under_cabinet_lighting"],
+        "primary_identifier": "Cabinetry + countertops + appliances (stove, fridge, sink)"
+    },
+    "primary_bedroom": {
+        "name": "Primary Bedroom",
+        "icon": "room_primary_bed",
+        "keywords": ["master", "primary", "main_bed", "master_bedroom", "primary_suite"],
+        "features": ["king_bed", "queen_bed", "large_bed", "headboard", "nightstands", "dresser",
+                     "walk_in_closet", "ensuite_bathroom", "ensuite_door", "seating_area", "accent_chair",
+                     "chaise_lounge", "bench", "ceiling_fan", "tray_ceiling", "coffered_ceiling",
+                     "vaulted_ceiling", "tv", "blackout_curtains"],
+        "primary_identifier": "Large bed + two nightstands + ensuite door visible"
+    },
+    "bedroom": {
+        "name": "Secondary Bedroom",
+        "icon": "room_bedroom",
+        "keywords": ["bed", "guest", "room", "secondary", "guest_bedroom", "kids_room"],
+        "features": ["twin_bed", "full_bed", "queen_bed", "single_nightstand", "smaller_closet",
+                     "reach_in_closet", "desk", "bunk_beds", "trundle_bed", "bookshelf", "toy_storage"],
+        "primary_identifier": "Smaller bed + no ensuite + smaller closet"
+    },
+    "primary_bathroom": {
+        "name": "Primary Bathroom",
+        "icon": "room_bathroom",
+        "keywords": ["master_bath", "primary_bath", "ensuite", "master_bathroom"],
+        "features": ["double_vanity", "two_sinks", "large_mirror", "walk_in_shower", "glass_enclosure",
+                     "frameless_glass", "freestanding_tub", "soaking_tub", "jetted_tub", "separate_shower",
+                     "tile_work", "water_closet", "linen_closet", "heated_towel_rack", "vanity_sconces"],
+        "primary_identifier": "Double vanity + separate shower and tub"
+    },
+    "bathroom": {
+        "name": "Secondary Bathroom",
+        "icon": "room_bathroom",
+        "keywords": ["bath", "guest_bath", "hall_bath", "full_bath"],
+        "features": ["single_vanity", "one_sink", "tub_shower_combo", "medicine_cabinet", "toilet",
+                     "vanity_bar_light", "towel_bar", "fiberglass_tub"],
+        "primary_identifier": "Single vanity + tub/shower combo"
+    },
+    "half_bath": {
+        "name": "Half Bath / Powder Room",
+        "icon": "room_bathroom",
+        "keywords": ["powder", "half", "powder_room", "half_bath"],
+        "features": ["toilet", "small_vanity", "pedestal_sink", "wall_mounted_sink", "small_mirror",
+                     "decorative_wallpaper", "accent_wall", "pocket_door"],
+        "primary_identifier": "Toilet + sink only, no tub/shower"
+    },
+    "laundry": {
+        "name": "Laundry Room",
+        "icon": "room_laundry",
+        "keywords": ["laundry", "washer", "dryer", "utility"],
+        "features": ["washer", "dryer", "stacked_units", "laundry_sink", "utility_sink", "countertop",
+                     "folding_surface", "cabinetry", "shelving", "ironing_board", "hanging_rod",
+                     "drying_rack", "lint_trap", "dryer_vent"],
+        "primary_identifier": "Washer + dryer"
+    },
+    "office": {
+        "name": "Home Office / Study",
+        "icon": "room_office",
+        "keywords": ["office", "study", "den", "work", "home_office"],
+        "features": ["desk", "executive_desk", "l_shaped_desk", "office_chair", "ergonomic_chair",
+                     "computer_monitor", "laptop", "bookshelves", "built_in_shelving", "task_lighting",
+                     "desk_lamp", "filing_cabinet", "printer", "whiteboard", "corkboard"],
+        "primary_identifier": "Desk + office chair + computer/monitor"
+    },
+    "backyard": {
+        "name": "Backyard",
+        "icon": "room_backyard",
+        "keywords": ["back", "backyard", "rear_yard", "back_yard"],
+        "features": ["lawn", "grass", "artificial_turf", "patio", "deck", "fence", "trees",
+                     "outdoor_dining", "grill", "bbq", "outdoor_kitchen", "pool", "spa", "play_structure",
+                     "swing_set", "fire_pit", "string_lights", "shed", "garden_beds", "outdoor_furniture",
+                     "sliding_glass_door", "french_doors"],
+        "primary_identifier": "Enclosed yard behind home + patio/deck + fence"
+    },
+    "pool": {
+        "name": "Pool / Spa",
+        "icon": "room_pool",
+        "keywords": ["pool", "swim", "spa", "hot_tub", "swimming_pool"],
+        "features": ["pool_water", "blue_water", "teal_water", "pool_decking", "coping", "concrete",
+                     "pavers", "travertine", "pool_equipment", "pump", "filter", "steps", "ladder",
+                     "beach_entry", "infinity_edge", "spa", "jets", "waterfall", "fountain", "pool_fence",
+                     "diving_board", "slide", "pool_lights"],
+        "primary_identifier": "Body of water with defined edges + decking"
+    },
+    "garden": {
+        "name": "Garden",
+        "icon": "room_garden",
+        "keywords": ["garden", "flowers", "vegetable", "planter", "landscaping"],
+        "features": ["raised_beds", "planting_areas", "flowering_plants", "shrubs", "vegetable_garden",
+                     "mulch", "bark", "gravel", "drip_irrigation", "garden_path", "stepping_stones",
+                     "potted_plants", "container_gardens", "arbor", "pergola", "trellis"],
+        "primary_identifier": "Organized planting beds with borders + mulch"
+    },
+    "sunroom": {
+        "name": "Sunroom",
+        "icon": "room_sunroom",
+        "keywords": ["sunroom", "sun_room", "solarium", "conservatory", "florida_room", "enclosed_patio"],
+        "features": ["floor_to_ceiling_windows", "glass_panels", "screened_panels", "abundant_natural_light",
+                     "wicker_furniture", "rattan", "plants", "greenery", "tile_flooring", "stone_flooring",
+                     "ceiling_fan", "views_of_yard"],
+        "primary_identifier": "Multiple glass walls + abundant natural light"
     },
     "patio": {
-        "name": "Patio",
+        "name": "Patio / Deck",
         "icon": "room_patio",
         "keywords": ["patio", "deck", "terrace", "outdoor_living"],
-        "features": ["outdoor_furniture", "pavers", "deck", "bbq", "umbrella"]
+        "features": ["concrete_slab", "pavers", "flagstone", "wood_deck", "composite_deck",
+                     "outdoor_dining_table", "outdoor_sofa", "outdoor_sectional", "grill", "bbq",
+                     "umbrella", "pergola", "shade_structure", "potted_plants", "outdoor_rug",
+                     "string_lights", "railing", "steps", "fire_pit"],
+        "primary_identifier": "Outdoor flat surface adjacent to home + furniture"
+    },
+    "porch": {
+        "name": "Porch",
+        "icon": "room_porch",
+        "keywords": ["porch", "front_porch", "back_porch", "covered_porch", "wraparound"],
+        "features": ["roof_covering", "columns", "posts", "wood_floor", "composite_floor",
+                     "rocking_chairs", "bench", "porch_swing", "adirondack_chairs", "railing",
+                     "balusters", "ceiling", "beadboard", "ceiling_fan", "pendant_light", "doormat",
+                     "hanging_flower_baskets", "steps"],
+        "primary_identifier": "Covered entry platform with roof + columns"
+    },
+    "side_yard": {
+        "name": "Side Yard",
+        "icon": "room_yard",
+        "keywords": ["side_yard", "side", "narrow_yard", "passage"],
+        "features": ["narrow_passage", "ac_condenser", "gas_meter", "electrical_panel", "hose_bib",
+                     "trash_bins", "recycling", "gate", "walkway", "gravel", "dog_run", "side_entry_door",
+                     "downspout"],
+        "primary_identifier": "Narrow strip + utility equipment + fence"
+    },
+    "front_yard": {
+        "name": "Front Yard",
+        "icon": "room_yard",
+        "keywords": ["front_yard", "front_lawn", "front_landscape"],
+        "features": ["lawn", "grass", "trees", "shrubs", "flower_beds", "mulch", "walkway", "pathway",
+                     "fence", "mailbox", "landscape_lighting"],
+        "primary_identifier": "Street-facing yard with landscaping"
+    },
+    "yard": {
+        "name": "Yard",
+        "icon": "room_yard",
+        "keywords": ["yard", "landscape"],
+        "features": ["grass", "trees", "plants", "fence", "sky"],
+        "primary_identifier": "General outdoor yard area"
+    },
+    "hallway": {
+        "name": "Hallway",
+        "icon": "room_hallway",
+        "keywords": ["hallway", "corridor", "hall", "passage"],
+        "features": ["narrow_space", "elongated", "multiple_doors", "hardwood", "carpet", "flush_mount",
+                     "recessed_lights", "wall_art", "family_photos", "gallery_wall", "linen_closet",
+                     "coat_closet", "thermostat", "smoke_detector"],
+        "primary_identifier": "Long narrow proportions with multiple doors"
+    },
+    "staircase": {
+        "name": "Staircase",
+        "icon": "room_staircase",
+        "keywords": ["stairs", "staircase", "stairway", "steps"],
+        "features": ["steps", "treads", "railing", "banister", "newel_posts", "balusters", "spindles",
+                     "landing", "handrail", "under_stair_storage", "wall_sconces", "pendant"],
+        "primary_identifier": "Ascending steps + railing/banister"
+    },
+    "closet": {
+        "name": "Closet",
+        "icon": "room_closet",
+        "keywords": ["closet", "walk_in", "wardrobe", "walk_in_closet"],
+        "features": ["hanging_rods", "clothes_hangers", "shelving", "shoe_racks", "drawers",
+                     "full_length_mirror", "led_lighting", "island", "jewelry_drawer", "tie_rack"],
+        "primary_identifier": "Hanging clothes + organized storage"
+    },
+    "mudroom": {
+        "name": "Mudroom",
+        "icon": "room_mudroom",
+        "keywords": ["mudroom", "mud_room", "entry"],
+        "features": ["hooks", "pegs", "bench", "shoe_storage", "cubbies", "lockers", "tile_flooring",
+                     "boot_tray", "storage_baskets", "utility_sink", "pet_supplies", "leash_hooks"],
+        "primary_identifier": "Hooks + bench + shoe storage at secondary entry"
+    },
+    "basement": {
+        "name": "Basement",
+        "icon": "room_basement",
+        "keywords": ["basement", "lower_level", "below_grade"],
+        "features": ["below_ground", "egress_windows", "low_ceilings", "furnace", "water_heater",
+                     "ductwork", "pipes", "concrete_walls", "sump_pump", "floor_drain", "drop_ceiling",
+                     "exposed_joists"],
+        "primary_identifier": "Below grade + small/high windows + mechanical systems"
+    },
+    "attic": {
+        "name": "Attic / Loft",
+        "icon": "room_attic",
+        "keywords": ["attic", "loft", "bonus_room"],
+        "features": ["sloped_ceiling", "angled_ceiling", "dormers", "exposed_beams", "rafters",
+                     "knee_walls", "pull_down_ladder", "skylights", "insulation", "limited_headroom"],
+        "primary_identifier": "Sloped ceilings following roofline"
+    },
+    "balcony": {
+        "name": "Balcony / Terrace",
+        "icon": "room_balcony",
+        "keywords": ["balcony", "terrace", "rooftop", "juliet"],
+        "features": ["elevated", "railing", "glass_barrier", "bistro_table", "compact_seating",
+                     "potted_plants", "railing_planters", "view"],
+        "primary_identifier": "Elevated outdoor platform + railing + upper floor access"
+    },
+    "home_gym": {
+        "name": "Home Gym",
+        "icon": "room_gym",
+        "keywords": ["gym", "fitness", "workout", "exercise"],
+        "features": ["treadmill", "stationary_bike", "elliptical", "rowing_machine", "free_weights",
+                     "dumbbells", "barbells", "weight_bench", "power_rack", "squat_rack", "rubber_flooring",
+                     "foam_mats", "wall_mirror", "yoga_mats", "resistance_bands"],
+        "primary_identifier": "Exercise equipment + rubber flooring + mirrors"
+    },
+    "home_theater": {
+        "name": "Home Theater",
+        "icon": "room_theater",
+        "keywords": ["theater", "media_room", "movie_room"],
+        "features": ["large_screen", "projector", "large_tv", "theater_seating", "reclining_chairs",
+                     "tiered_rows", "sectional", "dark_walls", "acoustic_panels", "surround_sound",
+                     "blackout_curtains", "ambient_lighting", "led_accent_lighting", "popcorn_machine"],
+        "primary_identifier": "Large screen + dark room + theater seating"
+    },
+    "wine_cellar": {
+        "name": "Wine Cellar",
+        "icon": "room_wine",
+        "keywords": ["wine", "cellar", "wine_room"],
+        "features": ["wine_racks", "bottles_horizontal", "climate_control", "glass_door", "tasting_table",
+                     "stone_walls", "brick_walls", "dim_lighting", "barrel_decor", "temperature_display"],
+        "primary_identifier": "Horizontal wine bottle racks + climate control"
+    },
+    "adu": {
+        "name": "ADU / Guest House",
+        "icon": "room_adu",
+        "keywords": ["adu", "guest_house", "casita", "in_law", "accessory", "cottage", "granny_flat"],
+        "features": ["separate_structure", "own_entrance", "kitchenette", "full_kitchen", "small_fridge",
+                     "microwave", "cooktop", "bathroom", "sleeping_area", "murphy_bed", "mini_split",
+                     "compact_layout"],
+        "primary_identifier": "Self-contained unit with own kitchen + bath + entry"
+    },
+    "drone": {
+        "name": "Drone / Aerial",
+        "icon": "room_drone",
+        "keywords": ["drone", "aerial", "dji", "overhead", "roof"],
+        "features": ["roof_visible", "birds_eye", "neighborhood", "sky_dominant", "roofing_material",
+                     "shingles", "tile_roof", "metal_roof", "chimney", "skylights", "solar_panels",
+                     "gutters", "vents", "satellite_dish"],
+        "primary_identifier": "Roofing material + shape + penetrations from above"
+    },
+    "detail": {
+        "name": "Detail Shot",
+        "icon": "room_detail",
+        "keywords": ["detail", "close", "feature", "closeup"],
+        "features": ["close_up", "shallow_dof", "texture", "hardware", "architectural_detail"],
+        "primary_identifier": "Close-up of specific feature or detail"
+    },
+    "shed": {
+        "name": "Shed",
+        "icon": "room_shed",
+        "keywords": ["shed", "storage", "outbuilding", "tool_shed"],
+        "features": ["small_structure", "storage", "tools", "outdoor", "separate_building"],
+        "primary_identifier": "Small outdoor storage structure"
     }
 }
 
@@ -8469,49 +8662,50 @@ def display_auto_sort():
             </div>
             """, unsafe_allow_html=True)
 
-            # Display sorted preview with editable room types - SINGLE COLUMN
+            # Display sorted preview with editable room types - COMPACT LAYOUT
             st.markdown("### Preview & Edit Room Types")
-            st.caption("Change room types below, then click 'Apply Changes & Re-sort' to update the order.")
+            st.caption("Click any photo to enlarge. Change room types, then click 'Apply Changes' to update.")
 
             room_options = list(ROOM_TYPES.keys())
             room_labels = {k: ROOM_TYPES[k].get('name', k) for k in room_options}
 
             # Use a form to prevent reruns on every dropdown change
             with st.form(key="photo_edit_form"):
-                # Single column layout - one photo per row
+                # Compact layout - image on left, info on right
                 for idx, p in enumerate(sorted_photos):
-                    with st.container():
-                        # Large thumbnail
+                    # Two columns: image (left) | info (right)
+                    img_col, info_col = st.columns([1, 2])
+
+                    with img_col:
+                        # Clickable image - shows in expander for enlargement
                         if p.get('image_bytes'):
-                            st.image(p['image_bytes'], width=350)
+                            with st.expander(f"📷 Photo {idx + 1}", expanded=True):
+                                st.image(p['image_bytes'], use_container_width=True)
                         else:
-                            st.markdown("📷 Image preview unavailable")
+                            st.markdown("📷 Preview unavailable")
 
-                        # Info row
-                        col1, col2, col3 = st.columns([2, 2, 1])
+                    with info_col:
+                        # Original filename
+                        orig_name = p['filename'][:35] + '...' if len(p['filename']) > 35 else p['filename']
+                        st.markdown(f"**Original:** `{orig_name}`")
 
-                        with col1:
-                            st.markdown(f"**Original:** {p['filename'][:30]}{'...' if len(p['filename']) > 30 else ''}")
+                        # New filename
+                        new_name = p.get('new_filename', f"Photo-{idx+1}")
+                        st.markdown(f"**New:** `{new_name}`")
 
-                        with col2:
-                            # Editable room type dropdown
-                            current_room = p.get('room_type', 'living_room')
-                            current_idx_room = room_options.index(current_room) if current_room in room_options else 0
+                        # Room type dropdown
+                        current_room = p.get('room_type', 'living_room')
+                        current_idx_room = room_options.index(current_room) if current_room in room_options else 0
 
-                            st.selectbox(
-                                "Room Type",
-                                options=room_options,
-                                index=current_idx_room,
-                                format_func=lambda x: room_labels.get(x, x),
-                                key=f"room_edit_{idx}",
-                                label_visibility="collapsed"
-                            )
+                        st.selectbox(
+                            "AI Detected Room:",
+                            options=room_options,
+                            index=current_idx_room,
+                            format_func=lambda x: room_labels.get(x, x),
+                            key=f"room_edit_{idx}"
+                        )
 
-                        with col3:
-                            new_name = p.get('new_filename', f"Photo-{idx+1}")
-                            st.markdown(f"**→ {new_name}**")
-
-                        st.markdown("---")
+                    st.markdown("---")
 
                 # Submit button inside the form
                 submitted = st.form_submit_button("🔄 Apply Changes & Re-sort", use_container_width=True, type="primary")
