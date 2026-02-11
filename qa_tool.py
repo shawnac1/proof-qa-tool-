@@ -1793,7 +1793,7 @@ def render_footer():
                 <div style="font-size: 11px; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em;">Time Saved</div>
             </div>
         </div>
-        <p style="text-align: center; font-size: 11px; color: #71717a !important; letter-spacing: 0.05em;">Proof by Aerial Canvas · Beta v2.0.1</p>
+        <p style="text-align: center; font-size: 11px; color: #71717a !important; letter-spacing: 0.05em;">Proof by Aerial Canvas · Beta v2.1</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -2984,71 +2984,134 @@ def check_beat_sync(file_path: str, duration: float) -> QAIssue:
 
 def check_audio_levels(file_path: str) -> QAIssue:
     """
-    Check audio levels for peaking (too loud/clipping) or too quiet.
-    Uses ffmpeg's volumedetect filter.
+    Check audio levels against social media standards (YouTube, Instagram, TikTok).
+    Uses ffmpeg's ebur128 filter for proper LUFS measurement.
+
+    Target standards for social media delivery:
+    - Integrated loudness: -14 to -16 LUFS
+    - True peak: -1.0 dBTP maximum
+    - Loudness range (LRA): 4-8 LU
     """
     try:
+        # Use ebur128 filter for proper loudness measurement
         cmd = [
             'ffmpeg', '-i', file_path,
-            '-af', 'volumedetect',
+            '-af', 'ebur128=framelog=verbose',
             '-f', 'null', '-'
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
 
-        # Parse volume info from stderr
-        max_volume = None
-        mean_volume = None
+        # Parse LUFS measurements from stderr
+        integrated_lufs = None
+        true_peak = None
+        loudness_range = None
 
         for line in result.stderr.split('\n'):
-            if 'max_volume' in line:
-                match = re.search(r'max_volume:\s*([-\d.]+)\s*dB', line)
+            # Integrated loudness (I:)
+            if 'I:' in line and 'LUFS' in line:
+                match = re.search(r'I:\s*([-\d.]+)\s*LUFS', line)
                 if match:
-                    max_volume = float(match.group(1))
-            if 'mean_volume' in line:
-                match = re.search(r'mean_volume:\s*([-\d.]+)\s*dB', line)
+                    integrated_lufs = float(match.group(1))
+            # True peak (Peak:)
+            elif 'Peak:' in line and 'dBFS' in line:
+                match = re.search(r'Peak:\s*([-\d.]+)\s*dBFS', line)
                 if match:
-                    mean_volume = float(match.group(1))
+                    peak_val = float(match.group(1))
+                    if true_peak is None or peak_val > true_peak:
+                        true_peak = peak_val
+            # Loudness range (LRA:)
+            elif 'LRA:' in line and 'LU' in line:
+                match = re.search(r'LRA:\s*([-\d.]+)\s*LU', line)
+                if match:
+                    loudness_range = float(match.group(1))
 
-        if max_volume is None:
+        # Fallback to volumedetect if ebur128 didn't work
+        if integrated_lufs is None:
+            cmd_fallback = [
+                'ffmpeg', '-i', file_path,
+                '-af', 'volumedetect',
+                '-f', 'null', '-'
+            ]
+            result_fallback = subprocess.run(cmd_fallback, capture_output=True, text=True, timeout=300)
+
+            for line in result_fallback.stderr.split('\n'):
+                if 'max_volume' in line:
+                    match = re.search(r'max_volume:\s*([-\d.]+)\s*dB', line)
+                    if match:
+                        true_peak = float(match.group(1))
+                if 'mean_volume' in line:
+                    match = re.search(r'mean_volume:\s*([-\d.]+)\s*dB', line)
+                    if match:
+                        # Rough approximation: mean dBFS to LUFS (usually within a few dB)
+                        integrated_lufs = float(match.group(1))
+
+        if integrated_lufs is None and true_peak is None:
             return QAIssue(check_name="Audio Levels", status="warning", message="Could not analyze audio levels")
 
         issues = []
+        has_critical = False
+        has_warning = False
 
-        # Check for clipping (only at or above 0 dB is actual clipping)
-        if max_volume >= 0.0:
-            issues.append(f"CLIPPING detected (peak: {max_volume:.1f} dB)")
-        elif max_volume >= -1.0:
-            issues.append(f"Peaks very close to clipping ({max_volume:.1f} dB)")
+        # Check true peak (must be <= -1.0 dBTP for social media)
+        if true_peak is not None:
+            if true_peak >= 0.0:
+                issues.append(f"CLIPPING: True peak at {true_peak:.1f} dB (exceeds 0 dB)")
+                has_critical = True
+            elif true_peak > -1.0:
+                issues.append(f"Peak too hot: {true_peak:.1f} dB (should be below -1.0 dBTP)")
+                has_warning = True
 
-        # Check for audio too quiet
-        if mean_volume < -30:
-            issues.append(f"Audio too QUIET (avg: {mean_volume:.1f} dB)")
-        elif mean_volume < -24:
-            issues.append(f"Audio slightly quiet (avg: {mean_volume:.1f} dB)")
+        # Check integrated loudness (target -14 to -16 LUFS for social media)
+        if integrated_lufs is not None:
+            if integrated_lufs < -24:
+                issues.append(f"Too quiet: {integrated_lufs:.1f} LUFS (target -14 to -16 LUFS)")
+                has_critical = True
+            elif integrated_lufs < -17:
+                issues.append(f"Slightly quiet: {integrated_lufs:.1f} LUFS (target -14 to -16 LUFS)")
+                has_warning = True
+            elif integrated_lufs > -10:
+                issues.append(f"Too loud: {integrated_lufs:.1f} LUFS (may be normalized down)")
+                has_warning = True
+            elif integrated_lufs > -13:
+                issues.append(f"Slightly loud: {integrated_lufs:.1f} LUFS (YouTube will normalize down)")
+                has_warning = True
 
-        # Check for audio too loud overall
-        if mean_volume > -10:
-            issues.append(f"Audio may be too HOT (avg: {mean_volume:.1f} dB)")
+        # Check loudness range (target 4-8 LU for real estate video)
+        if loudness_range is not None:
+            if loudness_range > 12:
+                issues.append(f"Dynamic range too wide: {loudness_range:.1f} LU (target 4-8 LU)")
+                has_warning = True
+            elif loudness_range > 10:
+                issues.append(f"Dynamic range slightly wide: {loudness_range:.1f} LU")
+
+        # Build result message
+        level_info = []
+        if integrated_lufs is not None:
+            level_info.append(f"{integrated_lufs:.1f} LUFS")
+        if true_peak is not None:
+            level_info.append(f"peak {true_peak:.1f} dB")
+        if loudness_range is not None:
+            level_info.append(f"LRA {loudness_range:.1f} LU")
 
         if not issues:
             return QAIssue(
                 check_name="Audio Levels",
                 status="pass",
-                message=f"Good levels (peak: {max_volume:.1f} dB, avg: {mean_volume:.1f} dB)"
+                message=f"Good for social media ({', '.join(level_info)})"
             )
-        elif max_volume >= 0.0 or mean_volume < -30:
+        elif has_critical:
             return QAIssue(
                 check_name="Audio Levels",
                 status="fail",
                 message="; ".join(issues),
-                action="Adjust audio levels - aim for peaks around -6dB, average around -18dB"
+                action="Normalize to -14 to -16 LUFS with true peak below -1.0 dB"
             )
         else:
             return QAIssue(
                 check_name="Audio Levels",
                 status="warning",
                 message="; ".join(issues),
-                action="Consider normalizing audio levels"
+                action="Consider normalizing to -14 to -16 LUFS for optimal playback"
             )
 
     except Exception as e:
