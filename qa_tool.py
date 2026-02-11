@@ -21,7 +21,7 @@ from typing import List, Optional, Tuple, Dict
 import numpy as np
 
 # User authentication and tracking
-from database import user_db
+from database import user_db, learning_db
 
 # Google OAuth (optional - for team authentication)
 try:
@@ -162,7 +162,7 @@ def organize_in_dropbox(dbx, source_folder_path, project_name, clips_data, expor
     return dest_folder, len(exported_clips), xml_filename
 
 
-def organize_photos_in_dropbox(dbx, source_shared_link, sorted_photos):
+def organize_photos_in_dropbox(dbx, source_shared_link, sorted_photos, progress_callback=None):
     """
     Create organized folder in Dropbox with renamed photos.
 
@@ -170,12 +170,16 @@ def organize_photos_in_dropbox(dbx, source_shared_link, sorted_photos):
         dbx: Authenticated Dropbox client
         source_shared_link: Original Dropbox shared link
         sorted_photos: List of sorted photo data with new filenames
+        progress_callback: Optional function(current, total, filename) for progress updates
 
     Returns:
         (dest_folder_path, num_photos_copied) tuple
     """
     try:
         # Get the source folder path from shared link
+        if progress_callback:
+            progress_callback(0, len(sorted_photos), "Connecting to Dropbox...")
+
         link_meta = dbx.sharing_get_shared_link_metadata(source_shared_link)
         source_path = link_meta.path_lower
 
@@ -183,6 +187,9 @@ def organize_photos_in_dropbox(dbx, source_shared_link, sorted_photos):
         parent_path = os.path.dirname(source_path.rstrip('/'))
         folder_name = os.path.basename(source_path.rstrip('/'))
         dest_folder = f"{parent_path}/{folder_name}_Sorted"
+
+        if progress_callback:
+            progress_callback(0, len(sorted_photos), "Creating destination folder...")
 
         # Create the destination folder
         try:
@@ -198,7 +205,8 @@ def organize_photos_in_dropbox(dbx, source_shared_link, sorted_photos):
 
         # Copy and rename each photo
         copied_count = 0
-        for photo in sorted_photos:
+        total_photos = len(sorted_photos)
+        for i, photo in enumerate(sorted_photos):
             try:
                 # Source path in Dropbox
                 original_filename = photo['filename']
@@ -208,6 +216,9 @@ def organize_photos_in_dropbox(dbx, source_shared_link, sorted_photos):
                 _, ext = os.path.splitext(original_filename)
                 new_filename = f"{photo['new_filename']}{ext}"
                 dest_file_path = f"{dest_folder}/{new_filename}"
+
+                if progress_callback:
+                    progress_callback(i + 1, total_photos, f"Copying {new_filename}...")
 
                 # Copy file
                 dbx.files_copy_v2(source_file_path, dest_file_path)
@@ -1768,7 +1779,7 @@ def render_footer():
                 <div style="font-size: 11px; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em;">Time Saved</div>
             </div>
         </div>
-        <p style="text-align: center; font-size: 11px; color: #71717a !important; letter-spacing: 0.05em;">Proof by Aerial Canvas · Beta</p>
+        <p style="text-align: center; font-size: 11px; color: #71717a !important; letter-spacing: 0.05em;">Proof by Aerial Canvas · Beta v1.2</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -1800,9 +1811,9 @@ def show_login_page():
     """Display the Google Sign-In page"""
     st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
     .stApp, .main, .block-container { background: #000 !important; }
-    * { font-family: 'Inter', -apple-system, sans-serif !important; }
+    * { font-family: 'Poppins', -apple-system, sans-serif !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -1904,9 +1915,9 @@ def show_waitlist_page(user_info: dict):
     """Display the waitlist page for non-team users"""
     st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
     .stApp, .main, .block-container { background: #000 !important; }
-    * { font-family: 'Inter', -apple-system, sans-serif !important; }
+    * { font-family: 'Poppins', -apple-system, sans-serif !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -6592,6 +6603,42 @@ ROOM_TYPES = {
         "icon": "room_detail",
         "keywords": ["detail", "close", "feature"],
         "features": ["close_up", "shallow_dof", "texture", "hardware"]
+    },
+    "sunroom": {
+        "name": "Sunroom",
+        "icon": "room_sunroom",
+        "keywords": ["sunroom", "sun_room", "solarium", "conservatory", "florida_room"],
+        "features": ["large_windows", "natural_light", "plants", "wicker", "bright"]
+    },
+    "side_yard": {
+        "name": "Side Yard",
+        "icon": "room_yard",
+        "keywords": ["side_yard", "side", "narrow_yard", "passage"],
+        "features": ["narrow", "fence", "gate", "pathway", "plants"]
+    },
+    "garden": {
+        "name": "Garden",
+        "icon": "room_garden",
+        "keywords": ["garden", "flowers", "vegetable", "planter"],
+        "features": ["plants", "flowers", "raised_beds", "soil", "greenery"]
+    },
+    "shed": {
+        "name": "Shed",
+        "icon": "room_shed",
+        "keywords": ["shed", "storage", "outbuilding", "tool"],
+        "features": ["small_structure", "storage", "tools", "outdoor"]
+    },
+    "driveway": {
+        "name": "Driveway",
+        "icon": "room_driveway",
+        "keywords": ["driveway", "drive", "parking", "carport"],
+        "features": ["pavement", "concrete", "asphalt", "cars", "garage_approach"]
+    },
+    "patio": {
+        "name": "Patio",
+        "icon": "room_patio",
+        "keywords": ["patio", "deck", "terrace", "outdoor_living"],
+        "features": ["outdoor_furniture", "pavers", "deck", "bbq", "umbrella"]
     }
 }
 
@@ -6609,11 +6656,14 @@ HOME_VIDEO_ORDER = [
     # Opening - Establishing shots
     "drone",           # Aerial establishing shot
     "exterior_front",  # Front of house
-    "yard",            # Front yard if no drone
+    "driveway",        # Driveway
+    "front_yard",      # Front yard
+    "yard",            # General yard if no drone
 
     # Entry and main areas
     "entry",           # Entry/foyer
     "living_room",     # Main living space
+    "sunroom",         # Sunroom (often off living area)
     "kitchen",         # Kitchen
     "dining",          # Dining room
 
@@ -6635,8 +6685,12 @@ HOME_VIDEO_ORDER = [
 
     # Outdoor/closing
     "exterior_rear",   # Back of house
+    "side_yard",       # Side yards
     "backyard",        # Backyard
+    "patio",           # Patio/deck
+    "garden",          # Garden
     "pool",            # Pool area
+    "shed",            # Shed/outbuildings
 
     # Pull away is typically the last drone clip
 ]
@@ -6690,6 +6744,7 @@ def sort_photos_for_delivery(photos: List[Dict]) -> List[Dict]:
     - path: file path (optional)
 
     Returns sorted list with added 'new_filename' and 'sort_order' fields.
+    Naming format: 01-Front_Exterior.jpg, 02-Front_Exterior_2.jpg, etc.
     """
     if not photos:
         return photos
@@ -6712,34 +6767,90 @@ def sort_photos_for_delivery(photos: List[Dict]) -> List[Dict]:
     drone_photos.sort(key=get_sort_key)
     twilight_photos.sort(key=get_sort_key)
 
-    # Assign new filenames
+    def get_room_display_name(room_type: str) -> str:
+        """Convert room_type key to display name for filename"""
+        room_info = ROOM_TYPES.get(room_type, {})
+        name = room_info.get('name', room_type)
+        # Convert to filename-safe format: "Living Room" -> "Living_Room"
+        return name.replace(' ', '_').replace('/', '_')
+
+    def assign_descriptive_names(photo_list: list, prefix: str = None) -> list:
+        """Assign numbered descriptive filenames, handling duplicates"""
+        result = []
+        room_counts = {}  # Track how many of each room type we've seen
+        file_number = 1
+
+        for photo in photo_list:
+            photo = photo.copy()
+            room_type = photo.get('room_type', 'unknown')
+            room_name = get_room_display_name(room_type)
+
+            # Track duplicates
+            if room_type not in room_counts:
+                room_counts[room_type] = 0
+            room_counts[room_type] += 1
+
+            # Build filename: 01-Living_Room or 02-Living_Room_2
+            num_str = f"{file_number:02d}"
+            if room_counts[room_type] == 1:
+                # First of this room type - no suffix
+                base_name = f"{num_str}-{room_name}"
+            else:
+                # Duplicate - add number suffix
+                base_name = f"{num_str}-{room_name}_{room_counts[room_type]}"
+
+            # Add prefix for drone/twilight
+            if prefix:
+                base_name = f"{num_str}-{prefix}_{room_name}"
+                if room_counts[room_type] > 1:
+                    base_name = f"{num_str}-{prefix}_{room_name}_{room_counts[room_type]}"
+
+            photo['new_filename'] = base_name
+            photo['sort_order'] = file_number
+            photo['room_instance'] = room_counts[room_type]  # 1 = main, 2+ = alt
+            result.append(photo)
+            file_number += 1
+
+        return result
+
+    # Assign descriptive filenames to each category
     result = []
 
-    # Standard photos: Photo-1, Photo-2, etc.
-    for i, photo in enumerate(standard_photos, 1):
-        photo = photo.copy()
-        photo['new_filename'] = f"Photo-{i}"
-        photo['sort_order'] = i
-        photo['photo_type'] = 'photo'
-        result.append(photo)
+    # Standard photos first
+    standard_result = assign_descriptive_names(standard_photos)
+    for p in standard_result:
+        p['photo_type'] = 'photo'
+    result.extend(standard_result)
 
-    # Drone photos: Drone-1, Drone-2, etc.
+    # Drone photos
+    drone_result = assign_descriptive_names(drone_photos, prefix="Drone")
     base_order = len(result)
-    for i, photo in enumerate(drone_photos, 1):
-        photo = photo.copy()
-        photo['new_filename'] = f"Drone-{i}"
-        photo['sort_order'] = base_order + i
-        photo['photo_type'] = 'drone'
-        result.append(photo)
+    for i, p in enumerate(drone_result):
+        p['photo_type'] = 'drone'
+        p['sort_order'] = base_order + i + 1
+        # Renumber with correct position
+        num_str = f"{p['sort_order']:02d}"
+        room_name = get_room_display_name(p.get('room_type', 'unknown'))
+        if p.get('room_instance', 1) == 1:
+            p['new_filename'] = f"{num_str}-Drone_{room_name}"
+        else:
+            p['new_filename'] = f"{num_str}-Drone_{room_name}_{p['room_instance']}"
+    result.extend(drone_result)
 
-    # Twilight photos: Twilight-1, Twilight-2, etc.
+    # Twilight photos
+    twilight_result = assign_descriptive_names(twilight_photos, prefix="Twilight")
     base_order = len(result)
-    for i, photo in enumerate(twilight_photos, 1):
-        photo = photo.copy()
-        photo['new_filename'] = f"Twilight-{i}"
-        photo['sort_order'] = base_order + i
-        photo['photo_type'] = 'twilight'
-        result.append(photo)
+    for i, p in enumerate(twilight_result):
+        p['photo_type'] = 'twilight'
+        p['sort_order'] = base_order + i + 1
+        # Renumber with correct position
+        num_str = f"{p['sort_order']:02d}"
+        room_name = get_room_display_name(p.get('room_type', 'unknown'))
+        if p.get('room_instance', 1) == 1:
+            p['new_filename'] = f"{num_str}-Twilight_{room_name}"
+        else:
+            p['new_filename'] = f"{num_str}-Twilight_{room_name}_{p['room_instance']}"
+    result.extend(twilight_result)
 
     return result
 
@@ -7274,16 +7385,26 @@ def classify_clip_room(video_path: str, filename: str = "") -> Tuple[str, float]
     return ("unknown", 0.0)
 
 
-def classify_photo_room(image_path: str, filename: str = "", img=None) -> Tuple[str, float]:
+def classify_photo_room(image_path: str, filename: str = "", img=None, image_bytes: bytes = None) -> Tuple[str, float]:
     """
     Classify what room type a photo shows.
     Returns (room_type_key, confidence).
-    Uses YOLO object detection and visual analysis.
-    Can optionally accept pre-loaded image to avoid re-reading.
+    Uses learning database first, then YOLO object detection and visual analysis.
+    Can optionally accept pre-loaded image or image_bytes to avoid re-reading.
     """
     import cv2
 
-    # First check filename for keywords
+    # FIRST: Check learning database for this exact image
+    if image_bytes:
+        try:
+            learned = learning_db.get_learned_room(image_bytes)
+            if learned:
+                room_type, confidence = learned
+                return (room_type, confidence)  # Return learned classification
+        except Exception:
+            pass  # Continue with normal classification if learning db fails
+
+    # Check filename for keywords
     name_lower = filename.lower() if filename else os.path.basename(image_path).lower()
 
     for room_key, room_info in ROOM_TYPES.items():
@@ -7738,13 +7859,58 @@ def analyze_clip_quality(video_path: str, quick_mode: bool = False) -> Dict:
     }
 
 
+def get_descriptive_clip_name(clip_index: int, room_type: str, room_instance: int = 1) -> str:
+    """
+    Generate a descriptive clip name like 01-Living_Room or 02-Kitchen_2
+    """
+    room_info = ROOM_TYPES.get(room_type, {})
+    room_name = room_info.get('name', room_type)
+    # Convert to filename-safe format: "Living Room" -> "Living_Room"
+    room_name_safe = room_name.replace(' ', '_').replace('/', '_')
+
+    num_str = f"{clip_index:02d}"
+    if room_instance == 1:
+        return f"{num_str}-{room_name_safe}"
+    else:
+        return f"{num_str}-{room_name_safe}_{room_instance}"
+
+
+def assign_descriptive_clip_names(clips: List[Dict]) -> List[Dict]:
+    """
+    Assign descriptive names to video clips, handling duplicates.
+    Returns clips with added 'display_name' and 'clip_instance' fields.
+    """
+    room_counts = {}  # Track how many of each room type we've seen
+    result = []
+
+    for idx, clip in enumerate(clips):
+        clip = clip.copy()
+        room_type = clip.get('room_type', 'unknown')
+
+        # Track duplicates
+        if room_type not in room_counts:
+            room_counts[room_type] = 0
+        room_counts[room_type] += 1
+
+        clip['clip_instance'] = room_counts[room_type]
+        clip['display_name'] = get_descriptive_clip_name(idx + 1, room_type, room_counts[room_type])
+        clip['sort_order'] = idx + 1
+        result.append(clip)
+
+    return result
+
+
 def generate_fcpxml(clips: List[Dict], project_name: str = "Auto_Sort_Timeline") -> str:
     """
     Generate Final Cut Pro X XML (.fcpxml) for the organized clips.
     Each dict in clips should have: path, room_type, in_point, out_point, duration
+    Uses descriptive naming like 01-Living_Room, 02-Kitchen, etc.
     """
     from urllib.parse import quote
     import html
+
+    # Assign descriptive names to clips
+    clips = assign_descriptive_clip_names(clips)
 
     # Helper to create proper file URL
     def file_url(path: str) -> str:
@@ -7797,7 +7963,8 @@ def generate_fcpxml(clips: List[Dict], project_name: str = "Auto_Sort_Timeline")
         clip_id = f"r{idx + 10}"
         duration_secs = clip.get("duration", 10)
         duration_rational = f"{int(duration_secs * fps * 100)}/{int(fps * 100)}s"
-        clip_name = xml_escape(os.path.basename(clip.get("path", f"clip_{idx}")))
+        # Use descriptive name like "01-Living_Room" instead of original filename
+        clip_name = xml_escape(clip.get("display_name", os.path.basename(clip.get("path", f"clip_{idx}"))))
         clip_url = file_url(clip.get("path", ""))
 
         xml_lines.append(
@@ -7827,12 +7994,14 @@ def generate_fcpxml(clips: List[Dict], project_name: str = "Auto_Sort_Timeline")
         duration_rational = f"{int(clip_duration * fps * 100)}/{int(fps * 100)}s"
         start_rational = f"{int(in_point * fps * 100)}/{int(fps * 100)}s"
 
-        clip_name = xml_escape(os.path.basename(clip.get("path", f"clip_{idx}")))
+        # Use descriptive name like "01-Living_Room"
+        clip_name = xml_escape(clip.get("display_name", os.path.basename(clip.get("path", f"clip_{idx}"))))
         room_type = clip.get("room_type", "unknown")
         room_name = ROOM_TYPES.get(room_type, {}).get("name", room_type)
 
-        # Add comment for room type
-        xml_lines.append(f'          <!-- {room_name} -->')
+        # Add comment for room type (original filename for reference)
+        original_file = os.path.basename(clip.get("path", ""))
+        xml_lines.append(f'          <!-- {clip_name}: {room_name} (from {original_file}) -->')
         xml_lines.append(
             f'          <asset-clip ref="{clip_id}" offset="{offset_rational}" '
             f'name="{clip_name}" duration="{duration_rational}" start="{start_rational}"/>'
@@ -7855,9 +8024,13 @@ def generate_fcpxml(clips: List[Dict], project_name: str = "Auto_Sort_Timeline")
 def generate_premiere_xml(clips: List[Dict], project_name: str = "Auto_Sort_Timeline") -> str:
     """
     Generate Adobe Premiere Pro XML (.xml) for the organized clips.
+    Uses descriptive naming like 01-Living_Room, 02-Kitchen, etc.
     """
     from urllib.parse import quote
     import html
+
+    # Assign descriptive names to clips
+    clips = assign_descriptive_clip_names(clips)
 
     # Helper to create proper file URL for Premiere
     def file_url(path: str) -> str:
@@ -7904,7 +8077,8 @@ def generate_premiere_xml(clips: List[Dict], project_name: str = "Auto_Sort_Time
         duration_frames = out_frames - in_frames
         total_frames = int(total_duration * fps)
 
-        clip_name = xml_escape(os.path.basename(clip.get("path", f"clip_{idx}")))
+        # Use descriptive name like "01-Living_Room"
+        clip_name = xml_escape(clip.get("display_name", os.path.basename(clip.get("path", f"clip_{idx}"))))
         clip_url = file_url(clip.get("path", ""))
 
         xml_lines.extend([
@@ -8165,9 +8339,14 @@ def display_auto_sort():
             key="photo_sort_dropbox_autosort",
             label_visibility="collapsed"
         )
-        st.caption("Paste a Dropbox folder link containing photos")
 
-        if photo_sort_link and st.button("Analyze & Preview Sort Order", key="btn_photo_sort_autosort", use_container_width=True):
+        # Analyze button - always visible
+        analyze_clicked = st.button("🔍 Analyze & Preview Sort Order", key="btn_photo_sort_autosort", use_container_width=True, type="primary")
+
+        if analyze_clicked and not photo_sort_link:
+            st.warning("Please paste a Dropbox folder link first")
+
+        if analyze_clicked and photo_sort_link:
             progress_bar = st.progress(0)
             status_text = st.empty()
 
@@ -8221,6 +8400,7 @@ def display_auto_sort():
                                 'filename': fname,
                                 'path': path,
                                 'room_type': room_type,
+                                'original_room_type': room_type,  # Store original for learning
                                 'room_confidence': confidence,
                                 'photo_type': photo_type
                             })
@@ -8291,69 +8471,114 @@ def display_auto_sort():
 
             # Display sorted preview with editable room types - SINGLE COLUMN
             st.markdown("### Preview & Edit Room Types")
-            st.caption("Scroll through each photo. Change room type if needed - changes save automatically.")
+            st.caption("Change room types below, then click 'Apply Changes & Re-sort' to update the order.")
 
             room_options = list(ROOM_TYPES.keys())
             room_labels = {k: ROOM_TYPES[k].get('name', k) for k in room_options}
 
-            # Single column layout - one photo per row
-            for idx, p in enumerate(sorted_photos):
-                with st.container():
-                    # Large thumbnail
-                    if p.get('image_bytes'):
-                        # Click to expand
-                        with st.expander(f"🔍 Click to see full size", expanded=False):
-                            st.image(p['image_bytes'], use_container_width=True)
+            # Use a form to prevent reruns on every dropdown change
+            with st.form(key="photo_edit_form"):
+                # Single column layout - one photo per row
+                for idx, p in enumerate(sorted_photos):
+                    with st.container():
+                        # Large thumbnail
+                        if p.get('image_bytes'):
+                            st.image(p['image_bytes'], width=350)
+                        else:
+                            st.markdown("📷 Image preview unavailable")
 
-                        # Show large thumbnail (300px)
-                        st.image(p['image_bytes'], width=350)
-                    else:
-                        st.markdown("📷 Image preview unavailable")
+                        # Info row
+                        col1, col2, col3 = st.columns([2, 2, 1])
 
-                    # Info row
-                    col1, col2, col3 = st.columns([2, 2, 1])
+                        with col1:
+                            st.markdown(f"**Original:** {p['filename'][:30]}{'...' if len(p['filename']) > 30 else ''}")
 
-                    with col1:
-                        st.markdown(f"**Original:** {p['filename'][:30]}{'...' if len(p['filename']) > 30 else ''}")
+                        with col2:
+                            # Editable room type dropdown
+                            current_room = p.get('room_type', 'living_room')
+                            current_idx_room = room_options.index(current_room) if current_room in room_options else 0
 
-                    with col2:
-                        # Editable room type dropdown
-                        current_room = p.get('room_type', 'living_room')
-                        current_idx_room = room_options.index(current_room) if current_room in room_options else 0
+                            st.selectbox(
+                                "Room Type",
+                                options=room_options,
+                                index=current_idx_room,
+                                format_func=lambda x: room_labels.get(x, x),
+                                key=f"room_edit_{idx}",
+                                label_visibility="collapsed"
+                            )
 
-                        new_room = st.selectbox(
-                            "Room Type",
-                            options=room_options,
-                            index=current_idx_room,
-                            format_func=lambda x: room_labels.get(x, x),
-                            key=f"room_edit_{idx}",
-                            label_visibility="collapsed"
-                        )
+                        with col3:
+                            new_name = p.get('new_filename', f"Photo-{idx+1}")
+                            st.markdown(f"**→ {new_name}**")
 
-                        # Save changes to session state immediately
-                        if new_room != current_room:
-                            st.session_state['photo_sort_results'][idx]['room_type'] = new_room
+                        st.markdown("---")
 
-                    with col3:
-                        new_name = p.get('new_filename', f"Photo-{idx+1}")
-                        st.markdown(f"**→ {new_name}**")
+                # Submit button inside the form
+                submitted = st.form_submit_button("🔄 Apply Changes & Re-sort", use_container_width=True, type="primary")
 
-                    st.markdown("---")
+            # Process form submission
+            if submitted:
+                num_photos = len(st.session_state['photo_sort_results'])
+                progress_bar = st.progress(0)
+                status = st.empty()
+                corrections_saved = 0
 
-            # Re-sort button to apply room changes to filenames
-            if st.button("🔄 Apply Room Changes & Re-sort", key="btn_resort_apply", use_container_width=True, type="secondary"):
+                status.markdown(f"**Updating room types for {num_photos} photos...**")
+
+                # First, update room types from form values and save corrections for learning
+                for idx in range(num_photos):
+                    form_key = f"room_edit_{idx}"
+                    if form_key in st.session_state:
+                        photo = st.session_state['photo_sort_results'][idx]
+                        original_room = photo.get('original_room_type', photo.get('room_type'))
+                        new_room = st.session_state[form_key]
+
+                        # Save correction for learning if changed
+                        if new_room != original_room and photo.get('image_bytes'):
+                            try:
+                                learning_db.save_correction(
+                                    image_bytes=photo['image_bytes'],
+                                    original_filename=photo.get('filename', ''),
+                                    predicted_room=original_room,
+                                    corrected_room=new_room
+                                )
+                                corrections_saved += 1
+                            except Exception:
+                                pass  # Don't fail if learning db has issues
+
+                        st.session_state['photo_sort_results'][idx]['room_type'] = new_room
+                    progress_bar.progress(0.1 + (0.15 * (idx + 1) / num_photos))
+
+                if corrections_saved > 0:
+                    status.markdown(f"**Learning from {corrections_saved} corrections...** 🧠")
+                    progress_bar.progress(0.3)
+
+                status.markdown(f"**Sorting {num_photos} photos...** (applying room flow order)")
+                progress_bar.progress(0.4)
+
                 # Re-sort based on updated room types
                 resorted = sort_photos_for_delivery(st.session_state['photo_sort_results'])
-                # Preserve image bytes
+
+                # Preserve image bytes and original predictions
+                progress_bar.progress(0.6)
+                status.markdown(f"**Preserving image data...** ({num_photos} photos)")
                 for i, p in enumerate(resorted):
                     if i < len(st.session_state['photo_sort_results']):
                         # Find original by filename and copy image bytes
                         for orig in st.session_state['photo_sort_results']:
                             if orig['filename'] == p['filename']:
                                 p['image_bytes'] = orig.get('image_bytes')
+                                p['original_room_type'] = orig.get('original_room_type', orig.get('room_type'))
                                 break
+                    # Update progress
+                    progress_bar.progress(0.6 + (0.35 * (i + 1) / num_photos))
+
+                progress_bar.progress(1.0)
+                if corrections_saved > 0:
+                    status.markdown(f"**✅ Done!** Learned from {corrections_saved} corrections. Refreshing...")
+                else:
+                    status.markdown("**✅ Done!** Refreshing view...")
                 st.session_state['photo_sort_results'] = resorted
-                st.success("✅ Photos re-sorted based on room flow order!")
                 st.rerun()
 
             # Download/Save section (always visible when photos loaded)
@@ -8362,65 +8587,152 @@ def display_auto_sort():
             save_col1, save_col2 = st.columns(2)
 
             with save_col1:
-                # Save to Dropbox button
+                # Save to Dropbox button with live progress
                 if st.button("☁️ Save to Dropbox", key="btn_save_to_dropbox_photos", use_container_width=True, type="primary"):
-                    with st.spinner("Creating sorted folder in Dropbox..."):
-                        try:
-                            # Get Dropbox client
-                            dbx = dropbox.Dropbox(
-                                oauth2_refresh_token=DROPBOX_REFRESH_TOKEN,
-                                app_key=DROPBOX_APP_KEY,
-                                app_secret=DROPBOX_APP_SECRET
-                            )
+                    import time as time_module
 
-                            photos_to_save = st.session_state.get('photo_sort_results', sorted_photos)
+                    photos_to_save = st.session_state.get('photo_sort_results', sorted_photos)
+                    num_photos = len(photos_to_save)
 
-                            # Save to Dropbox
-                            dest_folder, num_copied = organize_photos_in_dropbox(
-                                dbx,
-                                photo_sort_link,
-                                photos_to_save
-                            )
+                    # Estimate time (~1-2 seconds per photo for Dropbox API)
+                    est_seconds = max(5, int(num_photos * 1.5))
 
-                            st.success(f"✅ Saved {num_copied} photos to Dropbox!")
-                            st.info(f"📁 New folder created: {dest_folder}")
+                    progress_bar = st.progress(0)
+                    status = st.empty()
+                    time_status = st.empty()
 
-                        except Exception as e:
-                            st.error(f"Error saving to Dropbox: {str(e)}")
+                    status.markdown(f"**☁️ Saving {num_photos} photos to Dropbox...**")
+                    time_status.markdown(f"*Estimated time: ~{est_seconds} seconds*")
+
+                    start_time = time_module.time()
+
+                    # Progress callback for live updates
+                    def update_progress(current, total, message):
+                        if total > 0:
+                            progress_bar.progress(current / total)
+                        elapsed = time_module.time() - start_time
+                        if current > 0:
+                            remaining = (elapsed / current) * (total - current)
+                            status.markdown(f"**☁️ {message}** ({current}/{total})")
+                            time_status.markdown(f"*{int(remaining)}s remaining...*")
+                        else:
+                            status.markdown(f"**☁️ {message}**")
+
+                    try:
+                        # Get Dropbox client
+                        dbx = dropbox.Dropbox(
+                            oauth2_refresh_token=DROPBOX_REFRESH_TOKEN,
+                            app_key=DROPBOX_APP_KEY,
+                            app_secret=DROPBOX_APP_SECRET
+                        )
+
+                        # Save to Dropbox with progress callback
+                        dest_folder, num_copied = organize_photos_in_dropbox(
+                            dbx,
+                            photo_sort_link,
+                            photos_to_save,
+                            progress_callback=update_progress
+                        )
+
+                        total_time = time_module.time() - start_time
+                        progress_bar.progress(1.0)
+                        status.empty()
+                        time_status.empty()
+                        st.success(f"✅ Saved {num_copied} photos to Dropbox in {total_time:.1f}s!")
+                        st.info(f"📁 New folder: {dest_folder}")
+
+                    except Exception as e:
+                        progress_bar.empty()
+                        status.empty()
+                        time_status.empty()
+                        st.error(f"Error saving to Dropbox: {str(e)}")
 
                 st.caption("Creates a new '_Sorted' folder in Dropbox with renamed photos")
 
             with save_col2:
-                # Download ZIP button - use image_bytes from session state
+                # Download ZIP - one click prepare and download
                 import zipfile
                 import io
+                import time
 
-                zip_buffer = io.BytesIO()
-                photos_to_zip = st.session_state.get('photo_sort_results', sorted_photos)
+                # Check if ZIP is ready in session state
+                if 'prepared_zip' not in st.session_state:
+                    st.session_state['prepared_zip'] = None
+                    st.session_state['zip_ready'] = False
 
-                with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
-                    for p in photos_to_zip:
-                        # Use image_bytes if available (for cloud deployment)
-                        if p.get('image_bytes'):
-                            _, ext = os.path.splitext(p['filename'])
-                            new_name = f"{p['new_filename']}{ext}"
-                            zf.writestr(new_name, p['image_bytes'])
-                        elif os.path.exists(p.get('path', '')):
-                            _, ext = os.path.splitext(p['filename'])
-                            new_name = f"{p['new_filename']}{ext}"
-                            zf.write(p['path'], new_name)
+                # Show download button if ZIP is already prepared
+                if st.session_state.get('zip_ready') and st.session_state.get('prepared_zip'):
+                    st.download_button(
+                        label="⬇️ Download ZIP",
+                        data=st.session_state['prepared_zip'],
+                        file_name="sorted_photos.zip",
+                        mime="application/zip",
+                        use_container_width=True,
+                        type="primary"
+                    )
+                    st.caption("✅ ZIP ready! Click above to download")
+                    # Button to prepare again if needed
+                    if st.button("🔄 Re-prepare ZIP", key="btn_reprepare_zip", use_container_width=True):
+                        st.session_state['zip_ready'] = False
+                        st.rerun()
+                else:
+                    # One-click prepare and download button
+                    if st.button("📦 Prepare & Download ZIP", key="btn_prepare_download_zip", use_container_width=True, type="primary"):
+                        photos_to_zip = st.session_state.get('photo_sort_results', sorted_photos)
+                        num_photos = len(photos_to_zip)
 
-                zip_buffer.seek(0)
-                folder_name = "sorted_photos"
+                        # Calculate estimated time (rough: ~0.1s per photo)
+                        est_seconds = max(1, int(num_photos * 0.1))
 
-                st.download_button(
-                    label="⬇️ Download ZIP",
-                    data=zip_buffer.getvalue(),
-                    file_name=f"{folder_name}.zip",
-                    mime="application/zip",
-                    use_container_width=True
-                )
+                        progress_bar = st.progress(0)
+                        status = st.empty()
+                        time_status = st.empty()
 
+                        status.markdown(f"**📦 Preparing {num_photos} photos for download...**")
+                        time_status.markdown(f"*Estimated time: ~{est_seconds} seconds*")
+
+                        start_time = time.time()
+                        zip_buffer = io.BytesIO()
+
+                        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+                            for i, p in enumerate(photos_to_zip):
+                                # Use image_bytes if available (for cloud deployment)
+                                if p.get('image_bytes'):
+                                    _, ext = os.path.splitext(p['filename'])
+                                    new_name = f"{p['new_filename']}{ext}"
+                                    zf.writestr(new_name, p['image_bytes'])
+                                elif os.path.exists(p.get('path', '')):
+                                    _, ext = os.path.splitext(p['filename'])
+                                    new_name = f"{p['new_filename']}{ext}"
+                                    zf.write(p['path'], new_name)
+
+                                # Update progress with live status
+                                progress = (i + 1) / num_photos
+                                progress_bar.progress(progress)
+                                elapsed = time.time() - start_time
+                                if i > 0:
+                                    remaining = (elapsed / (i + 1)) * (num_photos - i - 1)
+                                    status.markdown(f"**📦 Adding photo {i+1} of {num_photos}:** {p.get('new_filename', f'Photo-{i+1}')}")
+                                    time_status.markdown(f"*{int(remaining)}s remaining...*")
+                                else:
+                                    status.markdown(f"**📦 Adding photo {i+1} of {num_photos}...**")
+
+                        zip_buffer.seek(0)
+                        st.session_state['prepared_zip'] = zip_buffer.getvalue()
+                        st.session_state['zip_ready'] = True
+
+                        total_time = time.time() - start_time
+                        progress_bar.progress(1.0)
+                        status.markdown(f"**✅ ZIP ready!** ({num_photos} photos in {total_time:.1f}s)")
+                        time_status.empty()
+
+                        # Rerun to show download button
+                        st.rerun()
+
+                    st.caption("Click to prepare and download your sorted photos")
+
+        # Footer with stats
+        render_footer()
         return  # End photo sorting mode here
 
     # =============================================
@@ -10732,7 +11044,7 @@ def main():
     # Clean, Simple Design
     st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
     /* Force single black background everywhere */
     .stApp, .main, .block-container,
@@ -10747,7 +11059,7 @@ def main():
         background-color: #000 !important;
     }
 
-    * { font-family: 'Inter', -apple-system, sans-serif !important; }
+    * { font-family: 'Poppins', -apple-system, sans-serif !important; }
     #MainMenu, footer, header { visibility: hidden; }
 
     .block-container {
@@ -11079,13 +11391,13 @@ def main():
     # =============================================
     import base64
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    proof_logo_path = os.path.join(script_dir, "proof_logo.png")
+    proof_logo_path = os.path.join(script_dir, "Proof Logo.png")
 
     # Load and display logo - BIGGER
     if os.path.exists(proof_logo_path):
         with open(proof_logo_path, "rb") as f:
             proof_logo_b64 = base64.b64encode(f.read()).decode()
-        logo_html = f'<img src="data:image/png;base64,{proof_logo_b64}" style="max-width: 500px; width: 100%;">'
+        logo_html = f'<img src="data:image/png;base64,{proof_logo_b64}" style="max-width: 700px; width: 100%;">'
     else:
         logo_html = '<h1 style="color: #7B8CDE; font-size: 56px; font-weight: 600;">Proof</h1>'
 

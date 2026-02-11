@@ -273,3 +273,204 @@ class UserDatabase:
 
 # Global instance
 user_db = UserDatabase()
+
+
+class LearningDatabase:
+    """SQLite database for photo classification learning/feedback"""
+
+    def __init__(self, db_path: str = None):
+        if db_path is None:
+            db_path = os.path.join(os.path.dirname(__file__), 'learning.db')
+        self.db_path = db_path
+        self._init_db()
+
+    def _init_db(self):
+        """Initialize database with learning tables"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        # Photo corrections table - stores user corrections for learning
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS photo_corrections (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                image_hash TEXT NOT NULL,
+                original_filename TEXT,
+                predicted_room TEXT,
+                corrected_room TEXT NOT NULL,
+                confidence_boost REAL DEFAULT 1.0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                times_confirmed INTEGER DEFAULT 1
+            )
+        ''')
+
+        # Create index for fast hash lookups
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_image_hash ON photo_corrections(image_hash)
+        ''')
+
+        # Room detection stats - track accuracy per room type
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS room_accuracy (
+                room_type TEXT PRIMARY KEY,
+                total_predictions INTEGER DEFAULT 0,
+                correct_predictions INTEGER DEFAULT 0,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        conn.commit()
+        conn.close()
+
+    def compute_image_hash(self, image_bytes: bytes) -> str:
+        """Compute a perceptual hash of the image for similarity matching"""
+        import hashlib
+        from PIL import Image
+        import io
+
+        try:
+            # Open image and resize to small standard size for hashing
+            img = Image.open(io.BytesIO(image_bytes))
+            img = img.convert('L')  # Convert to grayscale
+            img = img.resize((16, 16), Image.Resampling.LANCZOS)
+
+            # Compute average hash
+            pixels = list(img.getdata())
+            avg = sum(pixels) / len(pixels)
+            bits = ''.join('1' if p > avg else '0' for p in pixels)
+
+            # Convert to hex string
+            hash_int = int(bits, 2)
+            return format(hash_int, '064x')
+        except Exception:
+            # Fallback to simple MD5 hash
+            return hashlib.md5(image_bytes).hexdigest()
+
+    def save_correction(self, image_bytes: bytes, original_filename: str,
+                       predicted_room: str, corrected_room: str) -> bool:
+        """Save a user's correction for future learning"""
+        if predicted_room == corrected_room:
+            # No correction needed, but track accuracy
+            self._update_accuracy(predicted_room, correct=True)
+            return False
+
+        image_hash = self.compute_image_hash(image_bytes)
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        # Check if we already have this exact image
+        cursor.execute('''
+            SELECT id, corrected_room, times_confirmed FROM photo_corrections
+            WHERE image_hash = ?
+        ''', (image_hash,))
+        existing = cursor.fetchone()
+
+        if existing:
+            if existing[1] == corrected_room:
+                # Same correction, increase confidence
+                cursor.execute('''
+                    UPDATE photo_corrections
+                    SET times_confirmed = times_confirmed + 1,
+                        confidence_boost = confidence_boost + 0.1
+                    WHERE id = ?
+                ''', (existing[0],))
+            else:
+                # Different correction, update it
+                cursor.execute('''
+                    UPDATE photo_corrections
+                    SET corrected_room = ?,
+                        times_confirmed = 1,
+                        confidence_boost = 1.0
+                    WHERE id = ?
+                ''', (corrected_room, existing[0]))
+        else:
+            # New correction
+            cursor.execute('''
+                INSERT INTO photo_corrections
+                (image_hash, original_filename, predicted_room, corrected_room)
+                VALUES (?, ?, ?, ?)
+            ''', (image_hash, original_filename, predicted_room, corrected_room))
+
+        conn.commit()
+        conn.close()
+
+        # Track accuracy
+        self._update_accuracy(predicted_room, correct=False)
+
+        return True
+
+    def get_learned_room(self, image_bytes: bytes) -> Optional[Tuple[str, float]]:
+        """Check if we have a learned room type for this image.
+        Returns (room_type, confidence) or None if not found."""
+        image_hash = self.compute_image_hash(image_bytes)
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            SELECT corrected_room, confidence_boost, times_confirmed
+            FROM photo_corrections
+            WHERE image_hash = ?
+        ''', (image_hash,))
+        result = cursor.fetchone()
+        conn.close()
+
+        if result:
+            room_type = result[0]
+            confidence = min(0.99, 0.8 + (result[1] * 0.05) + (result[2] * 0.02))
+            return room_type, confidence
+
+        return None
+
+    def _update_accuracy(self, room_type: str, correct: bool):
+        """Update accuracy tracking for a room type"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            INSERT INTO room_accuracy (room_type, total_predictions, correct_predictions)
+            VALUES (?, 1, ?)
+            ON CONFLICT(room_type) DO UPDATE SET
+                total_predictions = total_predictions + 1,
+                correct_predictions = correct_predictions + ?,
+                last_updated = CURRENT_TIMESTAMP
+        ''', (room_type, 1 if correct else 0, 1 if correct else 0))
+
+        conn.commit()
+        conn.close()
+
+    def get_accuracy_stats(self) -> Dict:
+        """Get accuracy statistics for all room types"""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            SELECT room_type, total_predictions, correct_predictions,
+                   CASE WHEN total_predictions > 0
+                        THEN ROUND(correct_predictions * 100.0 / total_predictions, 1)
+                        ELSE 0 END as accuracy_pct
+            FROM room_accuracy
+            ORDER BY total_predictions DESC
+        ''')
+        rows = cursor.fetchall()
+        conn.close()
+
+        return {row['room_type']: {
+            'total': row['total_predictions'],
+            'correct': row['correct_predictions'],
+            'accuracy': row['accuracy_pct']
+        } for row in rows}
+
+    def get_total_corrections(self) -> int:
+        """Get total number of corrections in the database"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM photo_corrections')
+        count = cursor.fetchone()[0]
+        conn.close()
+        return count
+
+
+# Global learning database instance
+learning_db = LearningDatabase()

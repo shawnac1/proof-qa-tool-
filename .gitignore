@@ -29,6 +29,7 @@ LOGG.png
 qa_feedback.db
 qa_stats.db
 users.db
+learning.db
 
 # Streamlit secrets (contains OAuth credentials)
 .streamlit/secrets.toml
