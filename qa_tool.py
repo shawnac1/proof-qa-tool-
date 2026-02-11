@@ -1793,7 +1793,7 @@ def render_footer():
                 <div style="font-size: 11px; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em;">Time Saved</div>
             </div>
         </div>
-        <p style="text-align: center; font-size: 11px; color: #71717a !important; letter-spacing: 0.05em;">Proof by Aerial Canvas · Beta v2.3</p>
+        <p style="text-align: center; font-size: 11px; color: #71717a !important; letter-spacing: 0.05em;">Proof by Aerial Canvas · Beta v2.4</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -6091,6 +6091,67 @@ def display_video_review_interface(report: QAReport, video_path: str = None, sho
                     <span style="color: #71717a; margin-left: 12px; font-size: 12px;">{issue.message}</span>
                 </div>
                 """, unsafe_allow_html=True)
+
+    # =============================================
+    # COPY SUMMARY FOR SLACK
+    # =============================================
+    # Build summary text for clipboard
+    filename = report.metadata.get('filename', report.filename)
+    summary_lines = []
+    summary_lines.append(f"QA Report: {filename}")
+    summary_lines.append(f"Score: {qa_score}% ({tier_status})")
+    summary_lines.append("")
+
+    if timeline_issues:
+        summary_lines.append("TIMELINE ISSUES:")
+        for _, issue in timeline_issues:
+            ts = format_timestamp_short(issue.timestamp_start) if issue.timestamp_start else ""
+            status = "FAIL" if issue.status == 'fail' else "WARNING"
+            summary_lines.append(f"  [{ts}] {status}: {issue.check_name} - {issue.message[:80]}")
+        summary_lines.append("")
+
+    if general_issues:
+        summary_lines.append("GENERAL ISSUES:")
+        for _, issue in general_issues:
+            status = "FAIL" if issue.status == 'fail' else "WARNING"
+            summary_lines.append(f"  {status}: {issue.check_name} - {issue.message[:80]}")
+        summary_lines.append("")
+
+    if not timeline_issues and not general_issues:
+        summary_lines.append("No issues found - ready for delivery!")
+
+    summary_text = "\\n".join(summary_lines)
+
+    # Copy to clipboard button using JavaScript
+    st.markdown("""
+    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #1d1d1f;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+            <span style="color: #fff; font-size: 14px; font-weight: 600;">Share Results</span>
+            <span style="color: #71717a; font-size: 11px;">Copy summary to send via Slack</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col1, col2 = st.columns([3, 1])
+    with col2:
+        copy_btn = st.button("Copy Summary", key=f"copy_summary_{report_key}", use_container_width=True, type="primary")
+
+    if copy_btn:
+        # Use st.components to inject JavaScript that copies to clipboard
+        import streamlit.components.v1 as components
+        escaped_text = summary_text.replace('"', '\\"').replace("'", "\\'")
+        components.html(f"""
+        <script>
+            navigator.clipboard.writeText("{escaped_text}").then(function() {{
+                // Success
+            }});
+        </script>
+        <div style="color: #4ade80; font-size: 12px; padding: 8px;">Copied to clipboard!</div>
+        """, height=40)
+
+    # Show preview of what will be copied
+    with st.expander("Preview Summary", expanded=False):
+        st.code(summary_text.replace("\\n", "\n"), language=None)
 
 
 def display_video_timeline_report(report: QAReport, video_path: str = None, show_feedback: bool = True):
