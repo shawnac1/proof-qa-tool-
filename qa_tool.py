@@ -8257,146 +8257,169 @@ def display_auto_sort():
                         drones = [p for p in sorted_photos if p['photo_type'] == 'drone']
                         twilights = [p for p in sorted_photos if p['photo_type'] == 'twilight']
 
-                        # Display sorted preview with editable room types
-                        st.markdown("### Preview & Edit Room Types")
-                        st.caption("Click any photo to see it larger. Change room types with the dropdown - order updates automatically.")
+                        # Store photos in session state for persistence (with image data)
+                        st.session_state['photo_sort_results'] = []
+                        st.session_state['photo_sort_link'] = photo_sort_link
 
-                        # Store photos in session state for persistence
-                        st.session_state['edited_photo_sort'] = sorted_photos.copy()
-                        st.session_state['photo_paths_cache'] = {p['filename']: p['path'] for p in sorted_photos}
+                        for p in sorted_photos:
+                            photo_data = p.copy()
+                            # Read and cache the image bytes for persistence
+                            if os.path.exists(p['path']):
+                                try:
+                                    with open(p['path'], 'rb') as f:
+                                        photo_data['image_bytes'] = f.read()
+                                except:
+                                    photo_data['image_bytes'] = None
+                            else:
+                                photo_data['image_bytes'] = None
+                            st.session_state['photo_sort_results'].append(photo_data)
 
-                        room_options = list(ROOM_TYPES.keys())
-                        room_labels = {k: ROOM_TYPES[k].get('name', k) for k in room_options}
+                # Display results if we have them in session state
+                if 'photo_sort_results' in st.session_state and st.session_state['photo_sort_results']:
+                    sorted_photos = st.session_state['photo_sort_results']
+                    photo_sort_link = st.session_state.get('photo_sort_link', '')
 
-                        # Track if any room changed
-                        rooms_changed = False
+                    st.markdown(f"""
+                    <div style="background: rgba(74, 222, 128, 0.1); border: 1px solid rgba(74, 222, 128, 0.3);
+                                border-radius: 10px; padding: 16px; margin-bottom: 20px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="color: #4ade80; font-size: 18px;">✓</span>
+                            <span style="color: #4ade80; font-weight: 600;">{len(sorted_photos)} photos ready to sort</span>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-                        # Display photos in a grid - 2 per row with large thumbnails
-                        for idx in range(0, len(sorted_photos), 2):
-                            cols = st.columns(2)
+                    # Display sorted preview with editable room types - SINGLE COLUMN
+                    st.markdown("### Preview & Edit Room Types")
+                    st.caption("Scroll through each photo. Change room type if needed - changes save automatically.")
 
-                            for col_idx, col in enumerate(cols):
-                                photo_idx = idx + col_idx
-                                if photo_idx >= len(sorted_photos):
-                                    break
+                    room_options = list(ROOM_TYPES.keys())
+                    room_labels = {k: ROOM_TYPES[k].get('name', k) for k in room_options}
 
-                                p = sorted_photos[photo_idx]
+                    # Single column layout - one photo per row
+                    for idx, p in enumerate(sorted_photos):
+                        with st.container():
+                            # Large thumbnail
+                            if p.get('image_bytes'):
+                                # Click to expand
+                                with st.expander(f"🔍 Click to see full size", expanded=False):
+                                    st.image(p['image_bytes'], use_container_width=True)
 
-                                with col:
-                                    # Large thumbnail with click to expand
-                                    if os.path.exists(p['path']):
-                                        with st.expander(f"📷 {p.get('new_filename', f'Photo-{photo_idx+1}')} - Click to enlarge", expanded=False):
-                                            st.image(p['path'], use_container_width=True)
+                                # Show large thumbnail (300px)
+                                st.image(p['image_bytes'], width=350)
+                            else:
+                                st.markdown("📷 Image preview unavailable")
 
-                                        # Show medium thumbnail
-                                        try:
-                                            st.image(p['path'], width=300)
-                                        except:
-                                            st.markdown("📷 Image preview unavailable")
-                                    else:
-                                        st.markdown("📷 Image not found")
+                            # Info row
+                            col1, col2, col3 = st.columns([2, 2, 1])
 
-                                    # Photo info and room selector
-                                    st.markdown(f"<div style='color: #71717a; font-size: 11px; margin-bottom: 4px;'>{p['filename']}</div>", unsafe_allow_html=True)
+                            with col1:
+                                st.markdown(f"**Original:** {p['filename'][:30]}{'...' if len(p['filename']) > 30 else ''}")
 
-                                    # Editable room type dropdown
-                                    current_room = p.get('room_type', 'living_room')
-                                    current_idx_room = room_options.index(current_room) if current_room in room_options else 0
+                            with col2:
+                                # Editable room type dropdown
+                                current_room = p.get('room_type', 'living_room')
+                                current_idx_room = room_options.index(current_room) if current_room in room_options else 0
 
-                                    new_room = st.selectbox(
-                                        "Room Type",
-                                        options=room_options,
-                                        index=current_idx_room,
-                                        format_func=lambda x: room_labels.get(x, x),
-                                        key=f"room_select_{photo_idx}",
+                                new_room = st.selectbox(
+                                    "Room Type",
+                                    options=room_options,
+                                    index=current_idx_room,
+                                    format_func=lambda x: room_labels.get(x, x),
+                                    key=f"room_edit_{idx}",
+                                    label_visibility="collapsed"
+                                )
+
+                                # Save changes to session state immediately
+                                if new_room != current_room:
+                                    st.session_state['photo_sort_results'][idx]['room_type'] = new_room
+
+                            with col3:
+                                new_name = p.get('new_filename', f"Photo-{idx+1}")
+                                st.markdown(f"**→ {new_name}**")
+
+                            st.markdown("---")
+
+                    # Re-sort button to apply room changes to filenames
+                    if st.button("🔄 Apply Room Changes & Re-sort", key="btn_resort_apply", use_container_width=True, type="secondary"):
+                        # Re-sort based on updated room types
+                        resorted = sort_photos_for_delivery(st.session_state['photo_sort_results'])
+                        # Preserve image bytes
+                        for i, p in enumerate(resorted):
+                            if i < len(st.session_state['photo_sort_results']):
+                                # Find original by filename and copy image bytes
+                                for orig in st.session_state['photo_sort_results']:
+                                    if orig['filename'] == p['filename']:
+                                        p['image_bytes'] = orig.get('image_bytes')
+                                        break
+                        st.session_state['photo_sort_results'] = resorted
+                        st.success("✅ Photos re-sorted based on room flow order!")
+                        st.rerun()
+
+                    # Download/Save section (always visible when photos loaded)
+                    st.markdown("### Save Sorted Photos")
+
+                    save_col1, save_col2 = st.columns(2)
+
+                    with save_col1:
+                        # Save to Dropbox button
+                        if st.button("☁️ Save to Dropbox", key="btn_save_to_dropbox_photos", use_container_width=True, type="primary"):
+                            with st.spinner("Creating sorted folder in Dropbox..."):
+                                try:
+                                    # Get Dropbox client
+                                    dbx = dropbox.Dropbox(
+                                        oauth2_refresh_token=DROPBOX_REFRESH_TOKEN,
+                                        app_key=DROPBOX_APP_KEY,
+                                        app_secret=DROPBOX_APP_SECRET
                                     )
 
-                                    # Track changes
-                                    if new_room != current_room:
-                                        sorted_photos[photo_idx]['room_type'] = new_room
-                                        rooms_changed = True
+                                    photos_to_save = st.session_state.get('photo_sort_results', sorted_photos)
 
-                                    # Show new filename
-                                    new_name = p.get('new_filename', f"Photo-{photo_idx+1}")
-                                    st.markdown(f"**New name:** {new_name}")
-                                    st.markdown("---")
+                                    # Save to Dropbox
+                                    dest_folder, num_copied = organize_photos_in_dropbox(
+                                        dbx,
+                                        photo_sort_link,
+                                        photos_to_save
+                                    )
 
-                        # Auto re-sort if rooms changed
-                        if rooms_changed:
-                            st.info("Room types changed! Click below to re-sort and update filenames.")
-                            if st.button("Apply Changes & Re-sort", key="btn_apply_resort", use_container_width=True, type="primary"):
-                                resorted = sort_photos_for_delivery(sorted_photos)
-                                st.session_state['edited_photo_sort'] = resorted
-                                st.session_state['photo_sort_data'] = resorted
-                                st.success("Photos re-sorted! Scroll up to see new order.")
+                                    st.success(f"✅ Saved {num_copied} photos to Dropbox!")
+                                    st.info(f"📁 New folder created: {dest_folder}")
 
-                        # Download/Save section
-                        st.markdown("### Save Sorted Photos")
+                                except Exception as e:
+                                    st.error(f"Error saving to Dropbox: {str(e)}")
 
-                        save_col1, save_col2 = st.columns(2)
+                        st.caption("Creates a new '_Sorted' folder in Dropbox with renamed photos")
 
-                        with save_col1:
-                            # Save to Dropbox button
-                            if st.button("☁️ Save to Dropbox", key="btn_save_to_dropbox_photos", use_container_width=True, type="primary"):
-                                with st.spinner("Creating sorted folder in Dropbox..."):
-                                    try:
-                                        # Get Dropbox client
-                                        dbx = dropbox.Dropbox(
-                                            oauth2_refresh_token=DROPBOX_REFRESH_TOKEN,
-                                            app_key=DROPBOX_APP_KEY,
-                                            app_secret=DROPBOX_APP_SECRET
-                                        )
+                    with save_col2:
+                        # Download ZIP button - use image_bytes from session state
+                        import zipfile
+                        import io
 
-                                        photos_to_save = st.session_state.get('edited_photo_sort', sorted_photos)
+                        zip_buffer = io.BytesIO()
+                        photos_to_zip = st.session_state.get('photo_sort_results', sorted_photos)
 
-                                        # Save to Dropbox
-                                        dest_folder, num_copied = organize_photos_in_dropbox(
-                                            dbx,
-                                            photo_sort_link,
-                                            photos_to_save
-                                        )
+                        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+                            for p in photos_to_zip:
+                                # Use image_bytes if available (for cloud deployment)
+                                if p.get('image_bytes'):
+                                    _, ext = os.path.splitext(p['filename'])
+                                    new_name = f"{p['new_filename']}{ext}"
+                                    zf.writestr(new_name, p['image_bytes'])
+                                elif os.path.exists(p.get('path', '')):
+                                    _, ext = os.path.splitext(p['filename'])
+                                    new_name = f"{p['new_filename']}{ext}"
+                                    zf.write(p['path'], new_name)
 
-                                        st.success(f"✅ Saved {num_copied} photos to Dropbox!")
-                                        st.info(f"📁 New folder created: {dest_folder}")
+                        zip_buffer.seek(0)
+                        folder_name = "sorted_photos"
 
-                                    except Exception as e:
-                                        st.error(f"Error saving to Dropbox: {str(e)}")
-
-                            st.caption("Creates a new '_Sorted' folder in Dropbox with renamed photos")
-
-                        with save_col2:
-                            # Download ZIP button
-                            import zipfile
-                            import io
-
-                            zip_buffer = io.BytesIO()
-                            photos_to_zip = st.session_state.get('edited_photo_sort', sorted_photos)
-
-                            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
-                                for p in photos_to_zip:
-                                    if os.path.exists(p['path']):
-                                        _, ext = os.path.splitext(p['filename'])
-                                        new_name = f"{p['new_filename']}{ext}"
-                                        zf.write(p['path'], new_name)
-
-                            zip_buffer.seek(0)
-                            folder_name = os.path.splitext(filename)[0] if filename else "photos"
-
-                            st.download_button(
-                                label="⬇️ Download ZIP",
-                                data=zip_buffer.getvalue(),
-                                file_name=f"{folder_name}_sorted.zip",
-                                mime="application/zip",
-                                use_container_width=True
-                            )
-
-                            st.caption("Download renamed photos as a ZIP file")
-
-                    # Cleanup
-                    try:
-                        os.unlink(tmp_path)
-                    except:
-                        pass
+                        st.download_button(
+                            label="⬇️ Download ZIP",
+                            data=zip_buffer.getvalue(),
+                            file_name=f"{folder_name}.zip",
+                            mime="application/zip",
+                            use_container_width=True
+                        )
 
         return  # End photo sorting mode here
 
