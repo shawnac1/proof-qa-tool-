@@ -1793,7 +1793,7 @@ def render_footer():
                 <div style="font-size: 11px; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em;">Time Saved</div>
             </div>
         </div>
-        <p style="text-align: center; font-size: 11px; color: #71717a !important; letter-spacing: 0.05em;">Proof by Aerial Canvas · Beta v1.3</p>
+        <p style="text-align: center; font-size: 11px; color: #71717a !important; letter-spacing: 0.05em;">Proof by Aerial Canvas · Beta v1.4</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -8697,13 +8697,33 @@ def display_auto_sort():
                         current_room = p.get('room_type', 'living_room')
                         current_idx_room = room_options.index(current_room) if current_room in room_options else 0
 
-                        st.selectbox(
-                            "AI Detected Room:",
-                            options=room_options,
-                            index=current_idx_room,
-                            format_func=lambda x: room_labels.get(x, x),
-                            key=f"room_edit_{idx}"
-                        )
+                        # Room dropdown and confidence in two columns
+                        room_col, conf_col = st.columns([3, 1])
+
+                        with room_col:
+                            st.selectbox(
+                                "AI Detected Room:",
+                                options=room_options,
+                                index=current_idx_room,
+                                format_func=lambda x: room_labels.get(x, x),
+                                key=f"room_edit_{idx}"
+                            )
+
+                        with conf_col:
+                            # Confidence percentage with color coding
+                            confidence = p.get('room_confidence', 0)
+                            if confidence > 0.7:
+                                conf_color = "#4ade80"  # Green - high confidence
+                            elif confidence > 0.4:
+                                conf_color = "#f59e0b"  # Orange - medium confidence
+                            else:
+                                conf_color = "#ef4444"  # Red - low confidence
+                            st.markdown(f"""
+                                <div style="padding-top: 28px;">
+                                    <span style="color: {conf_color}; font-weight: 600; font-size: 16px;">{confidence*100:.0f}%</span>
+                                    <span style="color: #71717a; font-size: 10px; display: block;">confidence</span>
+                                </div>
+                            """, unsafe_allow_html=True)
 
                     st.markdown("---")
 
