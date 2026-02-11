@@ -6,3 +6,6 @@ requests>=2.31.0
 dropbox>=11.36.0
 ultralytics>=8.0.0
 streamlit-google-auth>=0.1.0
+# CLIP Vision-Language Model for room classification
+torch>=2.0.0
+transformers>=4.30.0

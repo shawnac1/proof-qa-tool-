@@ -270,6 +270,360 @@ def get_yolo_model():
             return None
     return _yolo_model
 
+# =============================================
+# CLIP Vision-Language Model (Zero-Shot Room Classification)
+# =============================================
+try:
+    import torch
+    from PIL import Image as PILImage
+    from transformers import CLIPProcessor, CLIPModel
+    CLIP_AVAILABLE = True
+except ImportError:
+    CLIP_AVAILABLE = False
+
+# CLIP model cache
+_clip_model = None
+_clip_processor = None
+
+def get_clip_model():
+    """Load CLIP model (cached for performance)"""
+    global _clip_model, _clip_processor
+    if _clip_model is None and CLIP_AVAILABLE:
+        try:
+            # Use CLIP ViT-B/32 - good balance of speed and accuracy
+            model_name = "openai/clip-vit-base-patch32"
+            _clip_processor = CLIPProcessor.from_pretrained(model_name)
+            _clip_model = CLIPModel.from_pretrained(model_name)
+            # Move to GPU if available
+            if torch.cuda.is_available():
+                _clip_model = _clip_model.cuda()
+            _clip_model.eval()  # Set to evaluation mode
+        except Exception as e:
+            print(f"Could not load CLIP model: {e}")
+            return None, None
+    return _clip_model, _clip_processor
+
+# Room descriptions for CLIP zero-shot classification
+# These are natural language descriptions that CLIP understands well
+CLIP_ROOM_PROMPTS = {
+    "kitchen": [
+        "a photo of a kitchen with cabinets and countertops",
+        "a modern kitchen interior",
+        "a residential kitchen with appliances"
+    ],
+    "living_room": [
+        "a photo of a living room with a sofa",
+        "a cozy living room interior",
+        "a residential living room with furniture"
+    ],
+    "bedroom": [
+        "a photo of a bedroom with a bed",
+        "a bedroom interior with furniture",
+        "a residential bedroom"
+    ],
+    "primary_bedroom": [
+        "a photo of a master bedroom with a large bed",
+        "a spacious primary bedroom suite",
+        "a luxurious master bedroom"
+    ],
+    "bathroom": [
+        "a photo of a bathroom with a toilet and sink",
+        "a bathroom interior with fixtures",
+        "a residential bathroom"
+    ],
+    "dining_room": [
+        "a photo of a dining room with a table and chairs",
+        "a dining area with furniture",
+        "a residential dining room"
+    ],
+    "office": [
+        "a photo of a home office with a desk",
+        "a study room with bookshelves",
+        "a residential office space"
+    ],
+    "garage": [
+        "a photo of a garage interior",
+        "a residential garage with cars",
+        "a parking garage space"
+    ],
+    "laundry": [
+        "a photo of a laundry room with washer and dryer",
+        "a utility room with laundry machines",
+        "a residential laundry area"
+    ],
+    "exterior_front": [
+        "a photo of a house exterior front view",
+        "the front of a residential home",
+        "a house facade with entrance"
+    ],
+    "exterior_rear": [
+        "a photo of a house exterior back view",
+        "the rear of a residential home",
+        "a backyard view of a house"
+    ],
+    "backyard": [
+        "a photo of a backyard with grass",
+        "a residential backyard garden",
+        "an outdoor patio area"
+    ],
+    "pool": [
+        "a photo of a swimming pool",
+        "a residential pool area",
+        "a backyard with a pool"
+    ],
+    "hallway": [
+        "a photo of a hallway corridor",
+        "a residential hallway interior",
+        "an indoor corridor passage"
+    ],
+    "stairs": [
+        "a photo of stairs or staircase",
+        "a residential stairway",
+        "an indoor staircase"
+    ],
+    "closet": [
+        "a photo of a walk-in closet",
+        "a wardrobe closet interior",
+        "a storage closet with shelves"
+    ],
+    "aerial": [
+        "an aerial drone photo of a property",
+        "a bird's eye view of a house and neighborhood",
+        "an overhead aerial view of real estate"
+    ],
+    "other": [
+        "a photo of an empty room",
+        "an interior space",
+        "a residential room"
+    ]
+}
+
+def classify_with_clip(image, room_types_to_check=None) -> Dict[str, float]:
+    """
+    Classify an image using CLIP zero-shot classification.
+    Returns dict of {room_type: confidence_score}
+
+    Args:
+        image: Can be a file path (str), numpy array (from cv2), or PIL Image
+        room_types_to_check: Optional list of room types to check (defaults to all)
+    """
+    if not CLIP_AVAILABLE:
+        return {}
+
+    model, processor = get_clip_model()
+    if model is None or processor is None:
+        return {}
+
+    try:
+        # Convert image to PIL format
+        if isinstance(image, str):
+            # File path
+            pil_image = PILImage.open(image).convert('RGB')
+        elif isinstance(image, np.ndarray):
+            # OpenCV/numpy array (BGR to RGB)
+            import cv2
+            rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            pil_image = PILImage.fromarray(rgb_image)
+        elif hasattr(image, 'convert'):
+            # Already PIL Image
+            pil_image = image.convert('RGB')
+        else:
+            return {}
+
+        # Resize for efficiency (CLIP works well at 224x224)
+        pil_image = pil_image.resize((224, 224), PILImage.Resampling.LANCZOS)
+
+        # Determine which rooms to check
+        rooms_to_check = room_types_to_check if room_types_to_check else list(CLIP_ROOM_PROMPTS.keys())
+
+        # Build text prompts - use first prompt for each room for speed
+        text_prompts = []
+        room_keys = []
+        for room in rooms_to_check:
+            if room in CLIP_ROOM_PROMPTS:
+                text_prompts.append(CLIP_ROOM_PROMPTS[room][0])
+                room_keys.append(room)
+
+        if not text_prompts:
+            return {}
+
+        # Process inputs
+        inputs = processor(
+            text=text_prompts,
+            images=pil_image,
+            return_tensors="pt",
+            padding=True
+        )
+
+        # Move to GPU if available
+        if torch.cuda.is_available():
+            inputs = {k: v.cuda() for k, v in inputs.items()}
+
+        # Get predictions
+        with torch.no_grad():
+            outputs = model(**inputs)
+            logits_per_image = outputs.logits_per_image
+            probs = logits_per_image.softmax(dim=1)
+
+        # Convert to dict
+        probs_np = probs.cpu().numpy()[0]
+        scores = {}
+        for idx, room in enumerate(room_keys):
+            scores[room] = float(probs_np[idx])
+
+        return scores
+
+    except Exception as e:
+        print(f"CLIP classification error: {e}")
+        return {}
+
+
+# =============================================
+# EXTERIOR SHOT ANGLE CLASSIFICATION
+# =============================================
+# CLIP prompts for identifying camera angle/perspective of exterior shots
+CLIP_EXTERIOR_ANGLE_PROMPTS = {
+    "hero": [
+        "a straight-on front view of a house, symmetrical, centered",
+        "a house photographed directly from the front, head-on perspective",
+        "a symmetrical front facade of a home, centered composition"
+    ],
+    "left_angle": [
+        "a house photographed from the left side at an angle",
+        "an angled view of a house showing the left corner",
+        "a home exterior shot from the left perspective"
+    ],
+    "right_angle": [
+        "a house photographed from the right side at an angle",
+        "an angled view of a house showing the right corner",
+        "a home exterior shot from the right perspective"
+    ],
+    "aerial": [
+        "an aerial drone photo looking down at a house",
+        "a bird's eye view of a property from above",
+        "an overhead drone shot of a home"
+    ],
+    "aerial_angle": [
+        "an aerial photo of a house taken at an angle",
+        "a drone shot of a home from an elevated angle",
+        "an angled aerial view of a property"
+    ],
+    "street_view": [
+        "a house photographed from the street with the road visible",
+        "a home exterior with driveway and street in view",
+        "a residential property view from the sidewalk"
+    ],
+    "detail": [
+        "a close-up detail shot of a house feature",
+        "an architectural detail of a home exterior",
+        "a zoomed-in photo of a house element"
+    ],
+    "wide": [
+        "a wide establishing shot of a house with surroundings",
+        "a wide-angle photo showing the entire property",
+        "a panoramic view of a home and yard"
+    ]
+}
+
+# Sort order for exterior angles (hero first, then logical flow)
+EXTERIOR_ANGLE_SORT_ORDER = {
+    "hero": 0,           # Straight-on hero shot first
+    "left_angle": 1,     # Left angle second
+    "right_angle": 2,    # Right angle third
+    "wide": 3,           # Wide establishing shot
+    "street_view": 4,    # Street view
+    "aerial": 5,         # Aerial shots
+    "aerial_angle": 6,   # Aerial angle shots
+    "detail": 7,         # Detail shots last
+}
+
+def classify_exterior_angle(image) -> Tuple[str, float]:
+    """
+    Classify the camera angle/perspective of an exterior shot.
+    Returns (angle_type, confidence).
+
+    Angle types:
+    - hero: Straight-on front view (should be first)
+    - left_angle: Shot from the left
+    - right_angle: Shot from the right
+    - aerial: Drone shot from above
+    - aerial_angle: Elevated angle shot
+    - street_view: From the street/sidewalk
+    - detail: Close-up of features
+    - wide: Wide establishing shot
+    """
+    if not CLIP_AVAILABLE:
+        return ("hero", 0.5)  # Default to hero if CLIP not available
+
+    model, processor = get_clip_model()
+    if model is None or processor is None:
+        return ("hero", 0.5)
+
+    try:
+        # Convert image to PIL format
+        if isinstance(image, str):
+            pil_image = PILImage.open(image).convert('RGB')
+        elif isinstance(image, np.ndarray):
+            import cv2
+            rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            pil_image = PILImage.fromarray(rgb_image)
+        elif hasattr(image, 'convert'):
+            pil_image = image.convert('RGB')
+        else:
+            return ("hero", 0.5)
+
+        # Resize for CLIP
+        pil_image = pil_image.resize((224, 224), PILImage.Resampling.LANCZOS)
+
+        # Build prompts - use first prompt for each angle type
+        text_prompts = []
+        angle_keys = []
+        for angle, prompts in CLIP_EXTERIOR_ANGLE_PROMPTS.items():
+            text_prompts.append(prompts[0])
+            angle_keys.append(angle)
+
+        # Process with CLIP
+        inputs = processor(
+            text=text_prompts,
+            images=pil_image,
+            return_tensors="pt",
+            padding=True
+        )
+
+        if torch.cuda.is_available():
+            inputs = {k: v.cuda() for k, v in inputs.items()}
+
+        with torch.no_grad():
+            outputs = model(**inputs)
+            logits_per_image = outputs.logits_per_image
+            probs = logits_per_image.softmax(dim=1)
+
+        probs_np = probs.cpu().numpy()[0]
+
+        # Find best match
+        best_idx = probs_np.argmax()
+        best_angle = angle_keys[best_idx]
+        confidence = float(probs_np[best_idx])
+
+        return (best_angle, confidence)
+
+    except Exception as e:
+        print(f"Exterior angle classification error: {e}")
+        return ("hero", 0.5)
+
+
+def get_exterior_sort_key(angle: str, confidence: float) -> int:
+    """
+    Get sort key for exterior shots based on angle.
+    Lower number = earlier in sort order.
+    Hero shots come first, then left/right angles, then others.
+    """
+    base_order = EXTERIOR_ANGLE_SORT_ORDER.get(angle, 99)
+    # High confidence heroes should definitely be first
+    if angle == "hero" and confidence > 0.6:
+        return 0
+    return base_order
+
 
 # Object-to-Room mapping: which objects indicate which rooms
 OBJECT_ROOM_MAPPING = {
@@ -442,7 +796,8 @@ def parse_dropbox_shared_link(url: str) -> dict:
         "url": url,
         "is_valid": False,
         "is_folder": False,
-        "direct_url": None
+        "direct_url": None,
+        "folder_name": None
     }
 
     if not url:
@@ -459,6 +814,21 @@ def parse_dropbox_shared_link(url: str) -> dict:
         result["is_folder"] = True
     elif "/scl/fi/" in url or "/s/" in url:
         result["is_folder"] = False
+
+    # Extract folder name from URL
+    # Format: https://www.dropbox.com/scl/fo/xxxxx/FolderName?...
+    try:
+        # Remove query string
+        url_path = url.split('?')[0]
+        # Get the last part of the path (folder name)
+        path_parts = url_path.rstrip('/').split('/')
+        if len(path_parts) >= 1:
+            folder_name = urllib.parse.unquote(path_parts[-1])
+            # Clean up the folder name (remove any remaining URL encoding artifacts)
+            if folder_name and len(folder_name) > 2 and folder_name not in ['fo', 'fi', 'sh', 's']:
+                result["folder_name"] = folder_name
+    except:
+        pass
 
     # Create direct download URL (for files)
     if "?dl=0" in url:
@@ -976,8 +1346,8 @@ ICONS = {
     </svg>''',
 
     'video_icon': f'''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="{BRAND_PURPLE}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="2" y="4" width="14" height="16" rx="2"></rect>
-        <path d="M16 8l4-2v12l-4-2"></path>
+        <rect x="2" y="6" width="13" height="12" rx="2"></rect>
+        <polygon points="23 7 16 12 23 17 23 7" fill="{BRAND_PURPLE}" stroke="{BRAND_PURPLE}"></polygon>
     </svg>''',
 
     'timeline': f'''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="{BRAND_PURPLE}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1793,7 +2163,7 @@ def render_footer():
                 <div style="font-size: 11px; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em;">Time Saved</div>
             </div>
         </div>
-        <p style="text-align: center; font-size: 11px; color: #71717a !important; letter-spacing: 0.05em;">Proof by Aerial Canvas · Beta v2.6</p>
+        <p style="text-align: center; font-size: 11px; color: #71717a !important; letter-spacing: 0.05em;">Proof by Aerial Canvas · Beta v2.8</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -5702,10 +6072,30 @@ def download_from_dropbox(share_link: str) -> tuple:
             if utf8_match:
                 filename = urllib.parse.unquote(utf8_match[0])
             else:
-                # Fall back to regular filename
-                fname_match = re.findall('filename="?([^";\n]+)"?', cd)
+                # Fall back to regular filename with quotes
+                fname_match = re.findall(r'filename="([^"]+)"', cd)
                 if fname_match:
                     filename = urllib.parse.unquote(fname_match[0])
+                else:
+                    # Try without quotes
+                    fname_match = re.findall(r'filename=([^;\s]+)', cd)
+                    if fname_match:
+                        filename = urllib.parse.unquote(fname_match[0])
+
+        # Also check x-dropbox-content-name header (Dropbox-specific)
+        if 'x-dropbox-content-name' in response.headers:
+            filename = urllib.parse.unquote(response.headers['x-dropbox-content-name'])
+
+        # If filename still looks like a temp file or random string, try to extract from original URL
+        if filename and (filename.startswith('tmp') or len(filename) < 5 or '.' not in filename):
+            # Try to get filename from the original share link
+            original_path = urllib.parse.urlparse(share_link).path
+            original_parts = original_path.split('/')
+            for part in reversed(original_parts):
+                decoded_part = urllib.parse.unquote(part)
+                if '.' in decoded_part and len(decoded_part) > 5:
+                    filename = decoded_part
+                    break
 
         # Determine file extension
         ext = os.path.splitext(filename)[1].lower()
@@ -6015,25 +6405,22 @@ def display_video_review_interface(report: QAReport, video_path: str = None, sho
                 sev_bg = "#f59e0b"
                 sev_label = "WARNING"
 
-            # Compact issue card - inline JS for seeking (Streamlit strips script tags)
+            # Timeline issue card - card on left, dismiss button on right (same row)
             inline_seek_js = f"var v=document.querySelector('video');if(v){{v.currentTime={timestamp_sec};v.play();}}"
-            st.markdown(f"""
-            <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 8px; padding: 10px 14px; margin-bottom: 6px; border-left: 3px solid {cat_info['bg']};">
-                <div style="display: flex; align-items: center; justify-content: space-between;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span onclick="{inline_seek_js}" style="background: {cat_info['bg']}; color: #000 !important; -webkit-text-fill-color: #000; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; cursor: pointer;" title="Click to seek video">{timestamp}</span>
-                        <span style="background: {sev_bg}; color: #000 !important; -webkit-text-fill-color: #000; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700;">{sev_label}</span>
-                        <span style="color: #fff; font-weight: 500; font-size: 12px;">{issue.check_name}</span>
+            col_card, col_btn = st.columns([5, 1])
+            with col_card:
+                st.markdown(f"""
+                <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 8px; padding: 14px 16px; border-left: 3px solid {cat_info['bg']};">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                        <span onclick="{inline_seek_js}" style="background: {cat_info['bg']}; color: #000 !important; -webkit-text-fill-color: #000; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer;" title="Click to seek video">{timestamp}</span>
+                        <span style="background: {sev_bg}; color: #000 !important; -webkit-text-fill-color: #000; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">{sev_label}</span>
+                        <span style="color: #fff; font-weight: 600; font-size: 14px;">{issue.check_name}</span>
                     </div>
+                    <div style="color: #a1a1aa; font-size: 13px; line-height: 1.5;">{issue.message[:100]}{'...' if len(issue.message) > 100 else ''}</div>
                 </div>
-                <div style="color: #a1a1aa; font-size: 11px; line-height: 1.4; margin-top: 4px;">{issue.message[:100]}{'...' if len(issue.message) > 100 else ''}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            # Dismiss button below card, aligned right
-            _, btn_col = st.columns([5, 1])
-            with btn_col:
-                if st.button("Dismiss", key=f"dismiss_tl_{report_key}_{display_idx}", use_container_width=True):
+                """, unsafe_allow_html=True)
+            with col_btn:
+                if st.button("Dismiss", key=f"dismiss_tl_{report_key}_{display_idx}", type="primary"):
                     st.session_state[dismissed_key].add(issue_id)
                     st.rerun()
 
@@ -6061,31 +6448,26 @@ def display_video_review_interface(report: QAReport, video_path: str = None, sho
         </div>
         """, unsafe_allow_html=True)
 
-        # Build clean issue cards with dismiss buttons (side by side)
+        # Build issue cards - card on left, dismiss button on right (same row)
         for display_idx, (orig_idx, issue) in enumerate(general_issues):
             issue_id = get_issue_id(issue, orig_idx)
             severity_color = "#ef4444" if issue.status == 'fail' else "#f59e0b"
             severity_label = "FAIL" if issue.status == 'fail' else "WARNING"
-
-            # Clean message display
             short_msg = issue.message[:80] + "..." if len(issue.message) > 80 else issue.message
-            fix_hint = issue.action if issue.action else ""
 
-            st.markdown(f"""
-            <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 8px; padding: 10px 14px; margin-top: 6px;">
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
-                    <span style="background: {severity_color}; color: #000 !important; -webkit-text-fill-color: #000; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700;">{severity_label}</span>
-                    <span style="color: #fff; font-weight: 500; font-size: 12px;">{issue.check_name}</span>
+            col_card, col_btn = st.columns([5, 1])
+            with col_card:
+                st.markdown(f"""
+                <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 8px; padding: 14px 16px;">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                        <span style="background: {severity_color}; color: #000 !important; -webkit-text-fill-color: #000; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 700;">{severity_label}</span>
+                        <span style="color: #fff; font-weight: 600; font-size: 14px;">{issue.check_name}</span>
+                    </div>
+                    <div style="color: #a1a1aa; font-size: 13px; line-height: 1.5;">{short_msg}</div>
                 </div>
-                <div style="color: #a1a1aa; font-size: 11px; line-height: 1.4;">{short_msg}</div>
-                {f'<div style="color: #7B8CDE; font-size: 10px; margin-top: 6px; padding: 6px 8px; background: rgba(123, 140, 222, 0.08); border-radius: 4px;"><strong>Fix:</strong> {fix_hint[:60]}...</div>' if fix_hint and len(fix_hint) > 60 else (f'<div style="color: #7B8CDE; font-size: 10px; margin-top: 6px; padding: 6px 8px; background: rgba(123, 140, 222, 0.08); border-radius: 4px;"><strong>Fix:</strong> {fix_hint}</div>' if fix_hint else '')}
-            </div>
-            """, unsafe_allow_html=True)
-
-            # Dismiss button below card, aligned right
-            _, btn_col = st.columns([5, 1])
-            with btn_col:
-                if st.button("Dismiss", key=f"dismiss_gen_{report_key}_{display_idx}", use_container_width=True):
+                """, unsafe_allow_html=True)
+            with col_btn:
+                if st.button("Dismiss", key=f"dismiss_gen_{report_key}_{display_idx}", type="primary"):
                     st.session_state[dismissed_key].add(issue_id)
                     st.rerun()
 
@@ -7060,9 +7442,13 @@ def sort_photos_for_delivery(photos: List[Dict]) -> List[Dict]:
     - filename: original filename
     - room_type: detected room type
     - path: file path (optional)
+    - image_bytes: raw image bytes (optional, for exterior angle detection)
 
     Returns sorted list with added 'new_filename' and 'sort_order' fields.
     Naming format: 01-Front_Exterior.jpg, 02-Front_Exterior_2.jpg, etc.
+
+    For exterior shots, AI detects camera angle to put hero shot (straight-on) first,
+    then left angle, right angle, etc.
     """
     if not photos:
         return photos
@@ -7075,12 +7461,58 @@ def sort_photos_for_delivery(photos: List[Dict]) -> List[Dict]:
     # Create order map from PHOTO_ORDER
     order_map = {room: idx for idx, room in enumerate(PHOTO_ORDER)}
 
+    # Classify exterior angles for exterior photos (hero shot detection)
+    exterior_types = {'exterior_front', 'exterior_rear', 'backyard', 'pool'}
+
+    def classify_and_get_angle(photo):
+        """Classify exterior angle if not already done"""
+        if photo.get('exterior_angle'):
+            return photo.get('exterior_angle'), photo.get('angle_confidence', 0.5)
+
+        room = photo.get('room_type', '')
+        if room not in exterior_types:
+            return None, 0
+
+        # Try to classify angle using image
+        try:
+            if photo.get('image_bytes'):
+                # Convert bytes to PIL Image
+                import io
+                pil_img = PILImage.open(io.BytesIO(photo['image_bytes']))
+                angle, conf = classify_exterior_angle(pil_img)
+                photo['exterior_angle'] = angle
+                photo['angle_confidence'] = conf
+                return angle, conf
+            elif photo.get('path') and os.path.exists(photo.get('path', '')):
+                angle, conf = classify_exterior_angle(photo['path'])
+                photo['exterior_angle'] = angle
+                photo['angle_confidence'] = conf
+                return angle, conf
+        except Exception:
+            pass
+
+        return 'hero', 0.5  # Default to hero if can't classify
+
+    # Classify angles for exterior photos
+    for photo in standard_photos + drone_photos + twilight_photos:
+        if photo.get('room_type', '') in exterior_types:
+            classify_and_get_angle(photo)
+
     def get_sort_key(photo):
         room = photo.get('room_type', 'unknown')
-        # Unknown rooms go near the end
-        return order_map.get(room, 50)
+        base_order = order_map.get(room, 50)
 
-    # Sort each category by room order
+        # For exterior photos, sub-sort by angle
+        if room in exterior_types:
+            angle = photo.get('exterior_angle', 'hero')
+            angle_order = EXTERIOR_ANGLE_SORT_ORDER.get(angle, 99)
+            # Combine: base_order * 100 + angle_order
+            # This keeps all exteriors together but sorted by angle within
+            return (base_order, angle_order)
+
+        return (base_order, 0)
+
+    # Sort each category by room order (and angle for exteriors)
     standard_photos.sort(key=get_sort_key)
     drone_photos.sort(key=get_sort_key)
     twilight_photos.sort(key=get_sort_key)
@@ -7092,8 +7524,23 @@ def sort_photos_for_delivery(photos: List[Dict]) -> List[Dict]:
         # Convert to filename-safe format: "Living Room" -> "Living_Room"
         return name.replace(' ', '_').replace('/', '_')
 
+    def get_angle_display_name(angle: str) -> str:
+        """Convert angle key to display name for filename"""
+        angle_names = {
+            'hero': 'Hero',
+            'left_angle': 'Left',
+            'right_angle': 'Right',
+            'aerial': 'Aerial',
+            'aerial_angle': 'Aerial_Angle',
+            'street_view': 'Street',
+            'detail': 'Detail',
+            'wide': 'Wide'
+        }
+        return angle_names.get(angle, '')
+
     def assign_descriptive_names(photo_list: list, prefix: str = None) -> list:
-        """Assign numbered descriptive filenames, handling duplicates"""
+        """Assign numbered descriptive filenames, handling duplicates.
+        For exterior shots, includes angle in filename (Hero, Left, Right, etc.)"""
         result = []
         room_counts = {}  # Track how many of each room type we've seen
         file_number = 1
@@ -7103,25 +7550,25 @@ def sort_photos_for_delivery(photos: List[Dict]) -> List[Dict]:
             room_type = photo.get('room_type', 'unknown')
             room_name = get_room_display_name(room_type)
 
-            # Track duplicates
+            # For exterior shots, add angle to name
+            angle = photo.get('exterior_angle')
+            if angle and room_type in exterior_types:
+                angle_name = get_angle_display_name(angle)
+                if angle_name:
+                    room_name = f"{room_name}_{angle_name}"
+
+            # Track duplicates (use original room_type for counting)
             if room_type not in room_counts:
                 room_counts[room_type] = 0
             room_counts[room_type] += 1
 
-            # Build filename: 01-Living_Room or 02-Living_Room_2
+            # Build filename: 01-Front_Exterior_Hero or 02-Front_Exterior_Left
             num_str = f"{file_number:02d}"
-            if room_counts[room_type] == 1:
-                # First of this room type - no suffix
-                base_name = f"{num_str}-{room_name}"
-            else:
-                # Duplicate - add number suffix
-                base_name = f"{num_str}-{room_name}_{room_counts[room_type]}"
+            base_name = f"{num_str}-{room_name}"
 
             # Add prefix for drone/twilight
             if prefix:
                 base_name = f"{num_str}-{prefix}_{room_name}"
-                if room_counts[room_type] > 1:
-                    base_name = f"{num_str}-{prefix}_{room_name}_{room_counts[room_type]}"
 
             photo['new_filename'] = base_name
             photo['sort_order'] = file_number
@@ -7628,9 +8075,16 @@ def classify_clip_room(video_path: str, filename: str = "") -> Tuple[str, float]
     total_scores = {}
     reference_scores = {}
     yolo_scores = {}  # YOLO object detection scores
+    clip_scores = {}  # CLIP vision-language model scores
 
     for timestamp, frame in frames:
-        # 1. YOLO Object Detection (highest priority - actually sees objects)
+        # 1. CLIP Vision-Language Model (highest priority - understands scenes)
+        if CLIP_AVAILABLE:
+            frame_clip_scores = classify_with_clip(frame)
+            for room, score in frame_clip_scores.items():
+                clip_scores[room] = clip_scores.get(room, 0) + score
+
+        # 2. YOLO Object Detection (sees specific objects)
         if YOLO_AVAILABLE:
             detected_objects = detect_objects_in_frame(frame)
             if detected_objects:
@@ -7638,12 +8092,12 @@ def classify_clip_room(video_path: str, filename: str = "") -> Tuple[str, float]
                 for room, score in object_room_scores.items():
                     yolo_scores[room] = yolo_scores.get(room, 0) + score
 
-        # 2. Visual analysis scores (color, edges, patterns)
+        # 3. Visual analysis scores (color, edges, patterns)
         frame_scores = analyze_frame_for_room(frame)
         for room, score in frame_scores.items():
             total_scores[room] = total_scores.get(room, 0) + score
 
-        # 3. Reference image comparison scores (if references exist)
+        # 4. Reference image comparison scores (if references exist)
         if references:
             ref_scores = compare_to_references(frame, references)
             for room, score in ref_scores.items():
@@ -7664,23 +8118,32 @@ def classify_clip_room(video_path: str, filename: str = "") -> Tuple[str, float]
         for room in yolo_scores:
             yolo_scores[room] /= num_frames
 
+    if clip_scores:
+        for room in clip_scores:
+            clip_scores[room] /= num_frames
+
     # Combine scores with weighted priorities
-    # YOLO is most reliable (actually sees objects), then references, then visual heuristics
+    # CLIP > YOLO > References > Visual heuristics
     # Photo hints from same folder provide cross-training boost
     combined_scores = {}
 
-    # Start with visual heuristic scores (baseline)
+    # Start with visual heuristic scores (baseline - lowest weight)
     for room, score in total_scores.items():
-        combined_scores[room] = score * 0.3  # 30% weight
+        combined_scores[room] = score * 0.15  # 15% weight
 
     # Add reference image scores
     for room, score in reference_scores.items():
         if score > 0.3:
-            combined_scores[room] = combined_scores.get(room, 0) + (score * 0.4)  # 40% weight
+            combined_scores[room] = combined_scores.get(room, 0) + (score * 0.2)  # 20% weight
 
-    # Add YOLO scores (highest weight - these are actual object detections)
+    # Add YOLO scores (good for specific objects like beds, toilets)
     for room, score in yolo_scores.items():
-        combined_scores[room] = combined_scores.get(room, 0) + (score * 1.5)  # 150% weight (dominant)
+        combined_scores[room] = combined_scores.get(room, 0) + (score * 0.8)  # 80% weight
+
+    # Add CLIP scores (highest weight - best at understanding overall scene)
+    for room, score in clip_scores.items():
+        # CLIP scores are already probabilities (0-1), give them dominant weight
+        combined_scores[room] = combined_scores.get(room, 0) + (score * 2.0)  # 200% weight (dominant)
 
     # Add photo hints from same folder (cross-training from photos)
     # This helps when photos from the same property were already analyzed
@@ -7690,7 +8153,7 @@ def classify_clip_room(video_path: str, filename: str = "") -> Tuple[str, float]
             combined_scores[room] = combined_scores[room] * (1 + hint_score)
         else:
             # Add room as possibility if only photos detected it
-            combined_scores[room] = hint_score * 0.5
+            combined_scores[room] = hint_score * 0.3
 
     # Find best match
     if combined_scores:
@@ -7743,11 +8206,16 @@ def classify_photo_room(image_path: str, filename: str = "", img=None, image_byt
         scale = max_size / max(h, w)
         img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
 
-    # Score using same methods as video
+    # Score using multiple methods
     total_scores = {}
     yolo_scores = {}
+    clip_scores = {}
 
-    # 1. YOLO Object Detection
+    # 1. CLIP Vision-Language Model (highest priority - understands scenes)
+    if CLIP_AVAILABLE:
+        clip_scores = classify_with_clip(img)
+
+    # 2. YOLO Object Detection
     if YOLO_AVAILABLE:
         detected_objects = detect_objects_in_frame(img)
         if detected_objects:
@@ -7755,12 +8223,12 @@ def classify_photo_room(image_path: str, filename: str = "", img=None, image_byt
             for room, score in object_room_scores.items():
                 yolo_scores[room] = score
 
-    # 2. Visual analysis scores (color, edges, patterns)
+    # 3. Visual analysis scores (color, edges, patterns)
     frame_scores = analyze_frame_for_room(img)
     for room, score in frame_scores.items():
         total_scores[room] = score
 
-    # 3. Reference image comparison
+    # 4. Reference image comparison
     references = get_reference_images()
     reference_scores = {}
     if references:
@@ -7769,20 +8237,26 @@ def classify_photo_room(image_path: str, filename: str = "", img=None, image_byt
             reference_scores[room] = score
 
     # Combine scores with weighted priorities
+    # CLIP > YOLO > References > Visual heuristics
     combined_scores = {}
 
-    # Visual heuristic scores (baseline)
+    # Visual heuristic scores (baseline - lowest weight)
     for room, score in total_scores.items():
-        combined_scores[room] = score * 0.3
+        combined_scores[room] = score * 0.15  # 15% weight
 
     # Reference image scores
     for room, score in reference_scores.items():
         if score > 0.3:
-            combined_scores[room] = combined_scores.get(room, 0) + (score * 0.4)
+            combined_scores[room] = combined_scores.get(room, 0) + (score * 0.2)  # 20% weight
 
-    # YOLO scores (highest weight)
+    # YOLO scores (good for specific objects)
     for room, score in yolo_scores.items():
-        combined_scores[room] = combined_scores.get(room, 0) + (score * 1.5)
+        combined_scores[room] = combined_scores.get(room, 0) + (score * 0.8)  # 80% weight
+
+    # CLIP scores (highest weight - best at understanding overall scene)
+    for room, score in clip_scores.items():
+        # CLIP scores are already probabilities (0-1), give them dominant weight
+        combined_scores[room] = combined_scores.get(room, 0) + (score * 2.0)  # 200% weight (dominant)
 
     # Find best match
     if combined_scores:
@@ -8854,8 +9328,15 @@ def display_auto_sort():
                         current_room = p.get('room_type', 'living_room')
                         current_idx_room = room_options.index(current_room) if current_room in room_options else 0
 
-                        # Room dropdown and confidence in two columns
-                        room_col, conf_col = st.columns([3, 1])
+                        # Check if this is an exterior shot (show angle selector)
+                        is_exterior = current_room in {'exterior_front', 'exterior_rear', 'backyard', 'pool'}
+
+                        if is_exterior:
+                            # For exteriors: Room, Angle, and Confidence
+                            room_col, angle_col, conf_col = st.columns([2, 2, 1])
+                        else:
+                            # For interiors: Room and Confidence
+                            room_col, conf_col = st.columns([3, 1])
 
                         with room_col:
                             st.selectbox(
@@ -8865,6 +9346,30 @@ def display_auto_sort():
                                 format_func=lambda x: room_labels.get(x, x),
                                 key=f"room_edit_{idx}"
                             )
+
+                        # Angle dropdown for exterior shots
+                        if is_exterior:
+                            with angle_col:
+                                angle_options = ['hero', 'left_angle', 'right_angle', 'wide', 'street_view', 'aerial', 'aerial_angle', 'detail']
+                                angle_labels = {
+                                    'hero': '📸 Hero (Straight-on)',
+                                    'left_angle': '↖️ Left Angle',
+                                    'right_angle': '↗️ Right Angle',
+                                    'wide': '🌐 Wide Shot',
+                                    'street_view': '🛣️ Street View',
+                                    'aerial': '🚁 Aerial',
+                                    'aerial_angle': '🚁 Aerial Angle',
+                                    'detail': '🔍 Detail'
+                                }
+                                current_angle = p.get('exterior_angle', 'hero')
+                                current_idx_angle = angle_options.index(current_angle) if current_angle in angle_options else 0
+                                st.selectbox(
+                                    "Shot Angle:",
+                                    options=angle_options,
+                                    index=current_idx_angle,
+                                    format_func=lambda x: angle_labels.get(x, x),
+                                    key=f"angle_edit_{idx}"
+                                )
 
                         with conf_col:
                             # Confidence percentage with color coding
@@ -8904,9 +9409,11 @@ def display_auto_sort():
                 status.markdown(f"**Analyzing {num_photos} photos...**")
                 detail_status.markdown(f"<span style='color: #71717a; font-size: 12px;'>Step 1 of 4: Updating room classifications</span>", unsafe_allow_html=True)
 
-                # First, update room types from form values and save corrections for learning
+                # First, update room types and angles from form values and save corrections for learning
                 for idx in range(num_photos):
                     form_key = f"room_edit_{idx}"
+                    angle_key = f"angle_edit_{idx}"
+
                     if form_key in st.session_state:
                         photo = st.session_state['photo_sort_results'][idx]
                         original_room = photo.get('original_room_type', photo.get('room_type'))
@@ -8926,6 +9433,12 @@ def display_auto_sort():
                                 pass  # Don't fail if learning db has issues
 
                         st.session_state['photo_sort_results'][idx]['room_type'] = new_room
+
+                    # Update angle if it was edited (exterior shots only)
+                    if angle_key in st.session_state:
+                        new_angle = st.session_state[angle_key]
+                        st.session_state['photo_sort_results'][idx]['exterior_angle'] = new_angle
+
                     progress_bar.progress(0.1 + (0.15 * (idx + 1) / num_photos))
 
                 if corrections_saved > 0:
@@ -9037,9 +9550,7 @@ def display_auto_sort():
 
             with save_col2:
                 # Download ZIP - one click prepare and download
-                import zipfile
-                import io
-                import time
+                # Note: zipfile, io, time already imported at module level
 
                 # Check if ZIP is ready in session state
                 if 'prepared_zip' not in st.session_state:
@@ -9308,11 +9819,14 @@ def display_auto_sort():
                 # =============================================
                 st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
+                # Use folder name from Dropbox link as default project name
+                default_project_name = link_info.get("folder_name") or "AC_Project"
+
                 # Project name input
                 project_name_input = st.text_input(
                     "Project folder name",
-                    value="AC_Project",
-                    help="Name for the downloaded project folder",
+                    value=default_project_name,
+                    help="Name for the downloaded project folder (auto-filled from Dropbox folder name)",
                     placeholder="Enter project name..."
                 )
 
@@ -9425,8 +9939,8 @@ def display_auto_sort():
                     if go_disabled:
                         st.warning("Please connect to Dropbox first to use this mode.")
 
-                    # Single "Go" button that does everything
-                    if st.button("Go", type="primary", use_container_width=True, disabled=go_disabled):
+                    # Only show this Go button when Dropbox API mode is enabled
+                    if st.session_state.get('organize_in_dropbox', False) and st.button("Go", type="primary", use_container_width=True, disabled=go_disabled, key="go_dropbox_api"):
                         st.session_state.auto_sort_clips = []
                         st.session_state.quick_mode = quick_mode
                         st.session_state.timeline_only = timeline_only
@@ -9775,9 +10289,305 @@ def display_auto_sort():
                             st.rerun()
 
                 # =============================================
+                # LOCAL DOWNLOAD REVIEW STEP - Show analyzed clips for review/editing
+                # =============================================
+                if st.session_state.get('local_clips_for_review') and not st.session_state.get('ready_zip_path'):
+                    clips_for_review = st.session_state.local_clips_for_review
+
+                    st.markdown(f"""
+                    <div style="background: rgba(74, 222, 128, 0.1); border: 1px solid rgba(74, 222, 128, 0.3);
+                                border-radius: 12px; padding: 20px; margin: 20px 0;">
+                        <div style="color: #4ade80; font-size: 18px; font-weight: 700; margin-bottom: 8px;">
+                            Analysis Complete - {len(clips_for_review)} Clips Ready
+                        </div>
+                        <div style="color: #a1a1aa; font-size: 13px;">
+                            Analyzed in {st.session_state.get('local_clips_analysis_time', '0:00')} ({st.session_state.get('local_clips_avg_time', 0):.1f}s per clip).
+                            Review the detected room types below and fix any incorrect ones before creating the download.
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    # Room type options for dropdown - show friendly names
+                    room_options = list(ROOM_TYPES.keys())
+                    room_display_names = {k: ROOM_TYPES[k].get('name', k) for k in room_options}
+
+                    # Create editable table
+                    st.markdown("### Clips to Organize")
+
+                    # Header
+                    header_cols = st.columns([1, 2.5, 2, 1])
+                    with header_cols[0]:
+                        st.markdown("**Preview**")
+                    with header_cols[1]:
+                        st.markdown("**Filename**")
+                    with header_cols[2]:
+                        st.markdown("**Room Type**")
+                    with header_cols[3]:
+                        st.markdown("**Confidence**")
+
+                    st.markdown("---")
+
+                    # Editable rows with thumbnails
+                    updated_clips = []
+                    for idx, clip in enumerate(clips_for_review):
+                        row_cols = st.columns([1, 2.5, 2, 1])
+                        with row_cols[0]:
+                            # Show thumbnail
+                            thumbnail = clip.get('thumbnail')
+                            if thumbnail:
+                                st.markdown(f'<img src="{thumbnail}" style="border-radius: 4px; width: 100%; max-width: 100px;">', unsafe_allow_html=True)
+                            else:
+                                st.markdown('<div style="width: 80px; height: 45px; background: #333; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #666; font-size: 10px;">No preview</div>', unsafe_allow_html=True)
+                        with row_cols[1]:
+                            filename = clip.get('filename', 'Unknown')
+                            duration = clip.get('duration', 0)
+                            dur_str = f"{int(duration // 60)}:{int(duration % 60):02d}" if duration else ""
+                            st.markdown(f"""
+                            <div style="padding-top: 8px;">
+                                <div style="color: #fff; font-size: 13px; font-weight: 500;">{filename[:30]}{'...' if len(filename) > 30 else ''}</div>
+                                <div style="color: #71717a; font-size: 11px;">{dur_str}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        with row_cols[2]:
+                            # Dropdown to change room type - show friendly names
+                            current_room = clip.get('room_type', 'other')
+                            current_idx = room_options.index(current_room) if current_room in room_options else 0
+                            new_room = st.selectbox(
+                                f"Room for local clip {idx}",
+                                room_options,
+                                index=current_idx,
+                                key=f"local_room_select_{idx}",
+                                label_visibility="collapsed",
+                                format_func=lambda x: room_display_names.get(x, x)
+                            )
+                            clip['room_type'] = new_room
+                        with row_cols[3]:
+                            conf = clip.get('room_confidence', 0)
+                            color = "#4ade80" if conf > 0.7 else "#fbbf24" if conf > 0.4 else "#ef4444"
+                            st.markdown(f'<div style="padding-top: 12px;"><span style="color: {color}; font-weight: 600;">{conf:.0%}</span></div>', unsafe_allow_html=True)
+                        updated_clips.append(clip)
+
+                    st.markdown("---")
+
+                    # Summary
+                    room_counts = {}
+                    for clip in updated_clips:
+                        room = clip.get('room_type', 'other')
+                        room_counts[room] = room_counts.get(room, 0) + 1
+
+                    st.markdown("**Summary:** " + ", ".join([f"{ROOM_TYPES.get(r, {}).get('name', r)}: {c}" for r, c in sorted(room_counts.items())]))
+
+                    st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
+
+                    # Action buttons
+                    btn_col1, btn_col2 = st.columns([3, 1])
+                    with btn_col1:
+                        if st.button("Create ZIP File", type="primary", use_container_width=True, key="btn_create_local_zip"):
+                            project_name = st.session_state.get('project_name_for_download', 'AC_Project')
+                            export_fmt = st.session_state.get('export_format_for_download', 'DaVinci Resolve')
+                            temp_dir = st.session_state.get('local_clips_temp_dir', tempfile.gettempdir())
+
+                            progress_bar = st.progress(0)
+                            status_text = st.empty()
+
+                            status_text.markdown(f"**Creating {project_name}.zip...**")
+
+                            import shutil
+
+                            # Create temp project folder
+                            project_temp_dir = os.path.join(temp_dir, f"{project_name}_organized")
+                            os.makedirs(project_temp_dir, exist_ok=True)
+
+                            # Group and sort clips by room type
+                            room_order = list(ROOM_TYPES.keys())
+                            sorted_clips = sorted(updated_clips,
+                                key=lambda c: (room_order.index(c['room_type']) if c['room_type'] in room_order else 99, c.get('filename', '')))
+
+                            # Copy and rename files
+                            exported_clips = []
+                            room_counters = {}
+
+                            for idx, clip in enumerate(sorted_clips):
+                                progress_bar.progress((idx + 1) / len(sorted_clips) * 0.8)
+
+                                room = clip.get('room_type', 'other')
+                                room_name = ROOM_TYPES.get(room, {}).get('name', room).replace('/', '-').replace(' ', '')
+
+                                # Track counter per room
+                                if room not in room_counters:
+                                    room_counters[room] = 1
+                                else:
+                                    room_counters[room] += 1
+
+                                # Generate new filename: 01_Kitchen_01.mp4
+                                ext = os.path.splitext(clip.get('filename', '.mp4'))[1]
+                                new_filename = f"{idx+1:02d}_{room_name}_{room_counters[room]:02d}{ext}"
+                                dest_path = os.path.join(project_temp_dir, new_filename)
+
+                                # Copy file
+                                try:
+                                    src_path = clip.get('path', '')
+                                    if src_path and os.path.exists(src_path):
+                                        shutil.copy2(src_path, dest_path)
+                                        exported_clip = clip.copy()
+                                        exported_clip['path'] = new_filename  # Relative path for XML
+                                        exported_clip['filename'] = new_filename
+                                        exported_clips.append(exported_clip)
+                                except Exception as copy_err:
+                                    pass  # Skip files that can't be copied
+
+                            # Generate XML
+                            if export_fmt == "Final Cut Pro X":
+                                xml_content = generate_fcpxml(exported_clips, project_name)
+                                xml_filename = f"{project_name}.fcpxml"
+                            else:
+                                xml_content = generate_premiere_xml(exported_clips, project_name)
+                                xml_filename = f"{project_name}.xml"
+
+                            xml_path = os.path.join(project_temp_dir, xml_filename)
+                            with open(xml_path, 'w') as f:
+                                f.write(xml_content)
+
+                            progress_bar.progress(0.9)
+                            status_text.markdown("**Creating ZIP file (writing to disk)...**")
+
+                            # Write ZIP to disk instead of memory (handles large files)
+                            zip_path = os.path.join(temp_dir, f"{project_name}.zip")
+                            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_STORED) as zf:
+                                for root, dirs, files in os.walk(project_temp_dir):
+                                    for file in files:
+                                        file_path = os.path.join(root, file)
+                                        arcname = os.path.join(project_name, os.path.relpath(file_path, project_temp_dir))
+                                        zf.write(file_path, arcname)
+
+                            progress_bar.progress(1.0)
+                            status_text.empty()
+                            progress_bar.empty()
+
+                            # Store ZIP path (not data) - read from disk when downloading
+                            st.session_state.ready_zip_path = zip_path
+                            st.session_state.ready_zip_name = f"{project_name}.zip"
+                            st.session_state.ready_zip_clips = len(exported_clips)
+                            st.session_state.ready_zip_xml = xml_filename
+                            st.session_state.ready_zip_time = st.session_state.get('local_clips_analysis_time', '0:00')
+                            st.session_state.ready_zip_avg = st.session_state.get('local_clips_avg_time', 0)
+                            st.session_state.local_clips_for_review = None
+                            st.rerun()
+
+                    with btn_col2:
+                        if st.button("Cancel", use_container_width=True, key="btn_cancel_local_review"):
+                            st.session_state.local_clips_for_review = None
+                            st.session_state.local_clips_temp_dir = None
+                            st.rerun()
+
+                # Show download button if ZIP file is ready (on disk)
+                if st.session_state.get('ready_zip_path') and os.path.exists(st.session_state.ready_zip_path):
+                    zip_path = st.session_state.ready_zip_path
+                    zip_size = os.path.getsize(zip_path)
+
+                    # Format size for display
+                    if zip_size >= 1024 * 1024 * 1024:
+                        size_str = f"{zip_size / (1024**3):.1f} GB"
+                    elif zip_size >= 1024 * 1024:
+                        size_str = f"{zip_size / (1024**2):.0f} MB"
+                    else:
+                        size_str = f"{zip_size / 1024:.0f} KB"
+
+                    st.markdown(f"""
+                    <div style="background: rgba(74, 222, 128, 0.15); border: 1px solid rgba(74, 222, 128, 0.4);
+                                border-radius: 12px; padding: 20px; margin-top: 16px; margin-bottom: 16px;">
+                        <div style="color: #4ade80; font-size: 18px; font-weight: 700; margin-bottom: 8px;">Ready to Download!</div>
+                        <div style="color: #fff; margin-bottom: 12px;">
+                            <strong>{st.session_state.ready_zip_clips}</strong> clips organized
+                        </div>
+                        <div style="color: #a1a1aa; font-size: 13px; margin-bottom: 8px;">
+                            <strong>Contents:</strong> {st.session_state.ready_zip_clips} video files + {st.session_state.ready_zip_xml}
+                        </div>
+                        <div style="color: #a1a1aa; font-size: 13px; margin-bottom: 8px;">
+                            <strong>File size:</strong> {size_str}
+                        </div>
+                        <div style="color: #a1a1aa; font-size: 13px;">
+                            <strong>Processing time:</strong> {st.session_state.ready_zip_time} ({st.session_state.ready_zip_avg:.1f}s per clip)
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    # Check file size - large files need different handling
+                    MAX_DOWNLOAD_SIZE = 500 * 1024 * 1024  # 500MB limit for browser download
+
+                    if zip_size > MAX_DOWNLOAD_SIZE:
+                        # Large file - show path and alternative options
+                        st.warning(f"This ZIP file is too large ({size_str}) for browser download. Use one of these options:")
+
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.markdown(f"""
+                            **Option 1: Copy from Finder**
+                            ```
+                            {zip_path}
+                            ```
+                            """)
+                            # Open in Finder button
+                            if st.button("Open in Finder", type="primary", use_container_width=True, key="open_finder_zip"):
+                                import subprocess
+                                subprocess.run(['open', '-R', zip_path])
+                                st.success("Opened in Finder!")
+
+                        with col2:
+                            st.markdown("**Option 2: Use Terminal**")
+                            st.code(f'open "{zip_path}"', language="bash")
+                            st.markdown("**Or copy to Desktop:**")
+                            desktop_path = os.path.expanduser(f"~/Desktop/{st.session_state.ready_zip_name}")
+                            st.code(f'cp "{zip_path}" "{desktop_path}"', language="bash")
+
+                        st.markdown("---")
+                        if st.button("Start Over", use_container_width=True, key="start_over_large_zip"):
+                            try:
+                                os.remove(zip_path)
+                            except:
+                                pass
+                            st.session_state.ready_zip_path = None
+                            st.session_state.ready_zip_name = None
+                            st.session_state.ready_zip_clips = None
+                            st.session_state.ready_zip_xml = None
+                            st.session_state.ready_zip_time = None
+                            st.session_state.ready_zip_avg = None
+                            st.rerun()
+                    else:
+                        # Small enough file - use normal download
+                        col1, col2 = st.columns([3, 1])
+                        with col1:
+                            # Read zip from disk for download
+                            with open(zip_path, 'rb') as f:
+                                zip_data = f.read()
+                            st.download_button(
+                                label=f"Download {st.session_state.ready_zip_name}",
+                                data=zip_data,
+                                file_name=st.session_state.ready_zip_name,
+                                mime="application/zip",
+                                type="primary",
+                                use_container_width=True,
+                                key="download_ready_zip_from_disk"
+                            )
+                        with col2:
+                            if st.button("Start Over", use_container_width=True, key="start_over_disk_zip"):
+                                # Clean up temp file
+                                try:
+                                    os.remove(zip_path)
+                                except:
+                                    pass
+                                st.session_state.ready_zip_path = None
+                                st.session_state.ready_zip_name = None
+                                st.session_state.ready_zip_clips = None
+                                st.session_state.ready_zip_xml = None
+                                st.session_state.ready_zip_time = None
+                                st.session_state.ready_zip_avg = None
+                                st.rerun()
+
+                # =============================================
                 # DOWNLOAD MODE - Only if not using Dropbox API and not reviewing
                 # =============================================
-                if not st.session_state.get('organize_in_dropbox', False) and not st.session_state.get('dropbox_clips_for_review'):
+                if not st.session_state.get('organize_in_dropbox', False) and not st.session_state.get('dropbox_clips_for_review') and not st.session_state.get('local_clips_for_review') and not st.session_state.get('ready_zip_path'):
                     if st.button("Go", type="primary", use_container_width=True, key="go_download_mode"):
                         # Create download URL (change dl=0 to dl=1)
                             download_url = dropbox_link.replace("dl=0", "dl=1")
@@ -9980,6 +10790,15 @@ def display_auto_sort():
                                         # Analyze quality for best moments
                                         quality = analyze_clip_quality(clip_path, quick_mode=quick_mode)
 
+                                    # Extract thumbnail for review UI
+                                    thumbnail_b64 = None
+                                    try:
+                                        # Get frame from middle of clip for thumbnail
+                                        mid_time = quality.get("duration", 10) / 2
+                                        thumbnail_b64 = extract_frame_at_timestamp(clip_path, mid_time, width=120)
+                                    except:
+                                        pass
+
                                     st.session_state.auto_sort_clips.append({
                                         "path": clip_path,
                                         "filename": filename,  # Original filename for XML
@@ -9995,7 +10814,8 @@ def display_auto_sort():
                                         "shake_start": quality.get("shake_start", 0),
                                         "shake_end": quality.get("shake_end", 0),
                                         "hero_duration": quality.get("hero_duration", quality.get("duration", 0)),
-                                        "trim_suggestion": quality.get("trim_suggestion", "")
+                                        "trim_suggestion": quality.get("trim_suggestion", ""),
+                                        "thumbnail": thumbnail_b64  # Base64 encoded thumbnail
                                     })
 
                                     # Track time for this clip
@@ -10006,92 +10826,6 @@ def display_auto_sort():
                                 total_fmt = f"{int(total_time // 60)}:{int(total_time % 60):02d}"
                                 avg_per_clip = total_time / len(video_files) if video_files else 0
 
-                                status_text.markdown(f"**Step 2/3: Analysis complete!** {len(video_files)} clips processed")
-                                progress_bar.progress(0.7)
-
-                                # =============================================
-                                # CREATE DOWNLOADABLE ZIP
-                                # =============================================
-                                project_name = st.session_state.get('project_name_for_download', 'AC_Project')
-                                export_fmt = st.session_state.get('export_format_for_download', 'DaVinci Resolve')
-
-                                status_text.markdown(f"**Step 3/3: Creating {project_name}.zip...**")
-
-                                import shutil
-                                import io
-
-                                # Create temp project folder
-                                project_temp_dir = os.path.join(temp_dir, project_name)
-                                os.makedirs(project_temp_dir, exist_ok=True)
-
-                                # Group and sort clips by room type
-                                clips_to_save = st.session_state.auto_sort_clips
-                                room_order = list(ROOM_TYPES.keys())
-                                sorted_clips = sorted(clips_to_save,
-                                    key=lambda c: (room_order.index(c['room_type']) if c['room_type'] in room_order else 99, c['filename']))
-
-                                # Copy and rename files
-                                exported_clips = []
-                                room_counters = {}
-
-                                for idx, clip in enumerate(sorted_clips):
-                                    progress_bar.progress(0.7 + (idx + 1) / len(sorted_clips) * 0.2)
-
-                                    room = clip['room_type']
-                                    room_name = ROOM_TYPES.get(room, {}).get('name', room).replace('/', '-').replace(' ', '')
-
-                                    # Track counter per room
-                                    if room not in room_counters:
-                                        room_counters[room] = 1
-                                    else:
-                                        room_counters[room] += 1
-
-                                    # Generate new filename: 01_Kitchen_01.mp4
-                                    ext = os.path.splitext(clip['filename'])[1]
-                                    new_filename = f"{idx+1:02d}_{room_name}_{room_counters[room]:02d}{ext}"
-                                    dest_path = os.path.join(project_temp_dir, new_filename)
-
-                                    # Copy file
-                                    try:
-                                        if os.path.exists(clip['path']):
-                                            shutil.copy2(clip['path'], dest_path)
-                                            exported_clip = clip.copy()
-                                            exported_clip['path'] = new_filename  # Relative path for XML
-                                            exported_clip['filename'] = new_filename
-                                            exported_clips.append(exported_clip)
-                                    except Exception as copy_err:
-                                        pass  # Skip files that can't be copied
-
-                                # Generate XML (outside the for loop)
-                                if export_fmt == "Final Cut Pro X":
-                                    xml_content = generate_fcpxml(exported_clips, project_name)
-                                    xml_filename = f"{project_name}.fcpxml"
-                                else:
-                                    xml_content = generate_premiere_xml(exported_clips, project_name)
-                                    xml_filename = f"{project_name}.xml"
-
-                                xml_path = os.path.join(project_temp_dir, xml_filename)
-                                with open(xml_path, 'w') as f:
-                                    f.write(xml_content)
-
-                                progress_bar.progress(0.95)
-                                status_text.markdown("**Creating ZIP file...**")
-
-                                # Create ZIP file
-                                zip_buffer = io.BytesIO()
-                                # Use ZIP_STORED (no compression) - videos are already compressed, so this is much faster
-                                with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_STORED) as zf:
-                                    for root, dirs, files in os.walk(project_temp_dir):
-                                        for file in files:
-                                            file_path = os.path.join(root, file)
-                                            arcname = os.path.join(project_name, os.path.relpath(file_path, project_temp_dir))
-                                            zf.write(file_path, arcname)
-
-                                zip_buffer.seek(0)
-                                zip_data = zip_buffer.getvalue()
-
-                                progress_bar.progress(1.0)
-
                                 # Track stats
                                 stats_tracker.increment_stat('total_clips_analyzed', len(video_files))
 
@@ -10101,20 +10835,13 @@ def display_auto_sort():
                                 progress_bar.empty()
                                 status_text.empty()
 
-                                # Calculate timing
-                                total_time = time.time() - download_start
-                                total_fmt = f"{int(total_time // 60)}:{int(total_time % 60):02d}"
-                                avg_per_clip = total_time / max(len(sorted_clips), 1)
-
-                                # Store ZIP in session state so it persists across reruns
-                                st.session_state.ready_zip_data = zip_data
-                                st.session_state.ready_zip_name = f"{project_name}.zip"
-                                st.session_state.ready_zip_clips = len(exported_clips)
-                                st.session_state.ready_zip_xml = xml_filename
-                                st.session_state.ready_zip_time = total_fmt
-                                st.session_state.ready_zip_avg = avg_per_clip
-                                st.session_state.auto_sort_analyzed = False
+                                # Store clips for review step (instead of immediately creating ZIP)
+                                st.session_state.local_clips_for_review = st.session_state.auto_sort_clips.copy()
+                                st.session_state.local_clips_temp_dir = extract_dir
+                                st.session_state.local_clips_analysis_time = total_fmt
+                                st.session_state.local_clips_avg_time = avg_per_clip
                                 st.session_state.auto_sort_clips = []
+                                st.rerun()
 
                             except requests.exceptions.RequestException as e:
                                 st.error(f"Download failed: {e}")
@@ -10128,45 +10855,6 @@ def display_auto_sort():
                                     st.session_state.auto_sort_clips = []
                                 else:
                                     st.error(f"Error: {e}")
-
-                    # Show download button if ZIP is ready (persists across reruns)
-                    if st.session_state.get('ready_zip_data'):
-                        st.markdown(f"""
-                        <div style="background: rgba(74, 222, 128, 0.15); border: 1px solid rgba(74, 222, 128, 0.4);
-                                    border-radius: 12px; padding: 20px; margin-top: 16px; margin-bottom: 16px;">
-                            <div style="color: #4ade80; font-size: 18px; font-weight: 700; margin-bottom: 8px;">Ready to Download!</div>
-                            <div style="color: #fff; margin-bottom: 12px;">
-                                <strong>{st.session_state.ready_zip_clips}</strong> clips organized
-                            </div>
-                            <div style="color: #a1a1aa; font-size: 13px; margin-bottom: 8px;">
-                                <strong>Contents:</strong> {st.session_state.ready_zip_clips} video files + {st.session_state.ready_zip_xml}
-                            </div>
-                            <div style="color: #a1a1aa; font-size: 13px;">
-                                <strong>Processing time:</strong> {st.session_state.ready_zip_time} ({st.session_state.ready_zip_avg:.1f}s per clip)
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                        col1, col2 = st.columns([3, 1])
-                        with col1:
-                            st.download_button(
-                                label=f"Download {st.session_state.ready_zip_name}",
-                                data=st.session_state.ready_zip_data,
-                                file_name=st.session_state.ready_zip_name,
-                                mime="application/zip",
-                                type="primary",
-                                use_container_width=True,
-                                key="download_ready_zip"
-                            )
-                        with col2:
-                            if st.button("Start Over", use_container_width=True):
-                                st.session_state.ready_zip_data = None
-                                st.session_state.ready_zip_name = None
-                                st.session_state.ready_zip_clips = None
-                                st.session_state.ready_zip_xml = None
-                                st.session_state.ready_zip_time = None
-                                st.session_state.ready_zip_avg = None
-                                st.rerun()
 
     elif input_method == "Upload Files":
         uploaded_files = st.file_uploader(
@@ -11513,11 +12201,11 @@ def main():
         font-size: 11px;
     }
 
-    /* Tabs - Purple pill style */
+    /* Tabs - Purple pill style with smooth color transitions */
     .stTabs [data-baseweb="tab-list"] {
         background: #111 !important;
         border: 1px solid #1d1d1f !important;
-        border-radius: 8px !important;
+        border-radius: 10px !important;
         gap: 4px !important;
         padding: 4px !important;
         width: fit-content !important;
@@ -11527,13 +12215,14 @@ def main():
         color: #71717a !important;
         font-size: 13px !important;
         font-weight: 500 !important;
-        padding: 8px 16px !important;
+        padding: 10px 20px !important;
         border: none !important;
-        border-radius: 6px !important;
+        border-radius: 8px !important;
+        transition: background-color 0.2s ease, color 0.2s ease !important;
     }
     .stTabs [data-baseweb="tab"]:hover {
         color: #fff !important;
-        background: rgba(255,255,255,0.05) !important;
+        background: rgba(255,255,255,0.06) !important;
     }
     .stTabs [aria-selected="true"] {
         background: #7B8CDE !important;
@@ -11581,35 +12270,46 @@ def main():
     }
     .stTextInput input::placeholder { color: #71717a !important; }
 
-    /* Buttons - Primary (selected/action) */
+    /* Buttons - Consistent sizing for both primary and secondary */
+    .stButton > button {
+        border-radius: 8px !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        padding: 10px 20px !important;
+        min-height: 42px !important;
+        transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease !important;
+    }
+
+    /* Buttons - Primary (selected) */
     .stButton > button[kind="primary"] {
         background: #7B8CDE !important;
         color: #000000 !important;
         border: 1px solid #7B8CDE !important;
-        border-radius: 8px !important;
-        font-weight: 700 !important;
-        padding: 10px 20px !important;
     }
-    .stButton > button[kind="primary"]:hover { background: #9BA8E8 !important; border-color: #9BA8E8 !important; }
-    .stButton > button[kind="primary"] p, .stButton > button[kind="primary"] span, .stButton > button[kind="primary"] div {
+    .stButton > button[kind="primary"]:hover {
+        background: #9BA8E8 !important;
+        border-color: #9BA8E8 !important;
+    }
+    .stButton > button[kind="primary"] p,
+    .stButton > button[kind="primary"] span,
+    .stButton > button[kind="primary"] div {
         color: #000000 !important;
     }
 
-    /* Buttons - Secondary (unselected/alternative) */
+    /* Buttons - Secondary (unselected) */
     .stButton > button[kind="secondary"] {
         background: #1a1a1a !important;
         color: #ffffff !important;
         border: 1px solid #333333 !important;
-        border-radius: 8px !important;
-        font-weight: 500 !important;
-        padding: 10px 20px !important;
     }
     .stButton > button[kind="secondary"]:hover {
         background: #252525 !important;
-        border-color: #7B8CDE !important;
+        border-color: #555 !important;
         color: #ffffff !important;
     }
-    .stButton > button[kind="secondary"] p, .stButton > button[kind="secondary"] span, .stButton > button[kind="secondary"] div {
+    .stButton > button[kind="secondary"] p,
+    .stButton > button[kind="secondary"] span,
+    .stButton > button[kind="secondary"] div {
         color: #ffffff !important;
     }
 
@@ -11883,7 +12583,7 @@ def main():
     # =============================================
     import base64
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    proof_logo_path = os.path.join(script_dir, "Proof Logo.png")
+    proof_logo_path = os.path.join(script_dir, "Proof.png")
 
     # Load and display logo - BIGGER
     if os.path.exists(proof_logo_path):
@@ -12111,21 +12811,57 @@ def main():
         </div>
         """, unsafe_allow_html=True)
 
-        # How it Works section
-        st.markdown(f"""
-        <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-                {icon('info', 18)}
-                <span style="color: #fff; font-weight: 600; font-size: 15px;">How it Works</span>
+        # How it Works + QA Scoring side by side (equal height cards)
+        info_col, score_col = st.columns([3, 2])
+
+        with info_col:
+            st.markdown(f"""
+            <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 20px; min-height: 180px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                    {icon('info', 18)}
+                    <span style="color: #fff; font-weight: 600; font-size: 15px;">How it Works</span>
+                </div>
+                <ol style="color: #a1a1aa; font-size: 13px; margin: 0; padding-left: 20px; line-height: 1.9;">
+                    <li>Paste your Dropbox video link below</li>
+                    <li>We analyze technical specs, audio, color, and 20+ checks</li>
+                    <li>Frame-by-frame scanning detects issues</li>
+                    <li>Get instant results with timestamps</li>
+                </ol>
             </div>
-            <ol style="color: #a1a1aa; font-size: 13px; margin: 0; padding-left: 20px; line-height: 1.8;">
-                <li>Paste your Dropbox video link below</li>
-                <li>We analyze technical specs, audio, color, and 20+ quality checks</li>
-                <li>Frame-by-frame scanning detects black frames, exposure issues, and more</li>
-                <li>Get instant pass/fail results with timestamps for any issues</li>
-            </ol>
-        </div>
-        """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
+
+        with score_col:
+            st.markdown("""
+            <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 20px; min-height: 180px;">
+                <div style="color: #fff; font-weight: 600; font-size: 15px; margin-bottom: 16px;">QA Score</div>
+                <div style="color: #71717a; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;">Score Tiers</div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="width: 8px; height: 8px; background: #4ade80; border-radius: 50%; display: inline-block;"></span>
+                        <span style="color: #4ade80; font-size: 13px; font-weight: 600; width: 52px;">90-100</span>
+                        <span style="color: #a1a1aa; font-size: 12px;">Pass</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="width: 8px; height: 8px; background: #facc15; border-radius: 50%; display: inline-block;"></span>
+                        <span style="color: #facc15; font-size: 13px; font-weight: 600; width: 52px;">70-89</span>
+                        <span style="color: #a1a1aa; font-size: 12px;">Review</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="width: 8px; height: 8px; background: #f59e0b; border-radius: 50%; display: inline-block;"></span>
+                        <span style="color: #f59e0b; font-size: 13px; font-weight: 600; width: 52px;">50-69</span>
+                        <span style="color: #a1a1aa; font-size: 12px;">Attention</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="width: 8px; height: 8px; background: #ef4444; border-radius: 50%; display: inline-block;"></span>
+                        <span style="color: #ef4444; font-size: 13px; font-weight: 600; width: 52px;">0-49</span>
+                        <span style="color: #a1a1aa; font-size: 12px;">Fail</span>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Spacing after cards
+        st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
 
         video_tab1, video_tab2 = st.tabs(["Dropbox Link", "Upload"])
 
@@ -12241,8 +12977,24 @@ def main():
                 label_visibility="collapsed"
             )
 
-            if video_file:
-                suffix = Path(video_file.name).suffix
+            # Check for cached upload report first
+            if 'cached_upload_report' in st.session_state and st.session_state.get('cached_upload_filename'):
+                display_video_review_interface(
+                    st.session_state['cached_upload_report'],
+                    st.session_state.get('cached_upload_path')
+                )
+                if st.button("Analyze New Video", key="btn_clear_upload_cache", use_container_width=True):
+                    del st.session_state['cached_upload_report']
+                    if 'cached_upload_path' in st.session_state:
+                        del st.session_state['cached_upload_path']
+                    if 'cached_upload_filename' in st.session_state:
+                        del st.session_state['cached_upload_filename']
+                    st.rerun()
+
+            elif video_file:
+                # Preserve the original filename
+                original_filename = video_file.name
+                suffix = Path(original_filename).suffix
                 with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                     tmp.write(video_file.getvalue())
                     tmp_path = tmp.name
@@ -12263,12 +13015,22 @@ def main():
 
                 report = run_video_qa(tmp_path, progress_callback=update_video_progress, analysis_mode=st.session_state.video_analysis_mode)
 
+                # Store the original filename in the report metadata
+                report.filename = original_filename
+                if not report.metadata:
+                    report.metadata = {}
+                report.metadata['filename'] = original_filename
+
                 progress_bar.progress(1.0)
                 status_text.empty()
                 progress_bar.empty()
 
+                # Cache the report for dismiss functionality
+                st.session_state['cached_upload_report'] = report
+                st.session_state['cached_upload_path'] = tmp_path
+                st.session_state['cached_upload_filename'] = original_filename
+
                 display_video_review_interface(report, tmp_path)
-                os.unlink(tmp_path)
 
     # =============================================
     # PHOTO PROOF
