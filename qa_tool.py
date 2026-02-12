@@ -13403,21 +13403,21 @@ def main():
     admin_link_html = ""
     if user_db.is_admin(user_email):
         small_gear = '''<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>'''
-        admin_link_html = f'<a href="{build_nav_url("admin")}" target="_top" style="display: block; padding: 10px 16px; color: {theme["text"]}; text-decoration: none; font-size: 13px; font-weight: 500; border-bottom: 1px solid {theme["border"]};">{small_gear}Admin</a>'
+        admin_link_html = f'<a href="{build_nav_url("admin")}" target="_parent" style="display: block; padding: 10px 16px; color: {theme["text"]}; text-decoration: none; font-size: 13px; font-weight: 500; border-bottom: 1px solid {theme["border"]};">{small_gear}Admin</a>'
 
     st.markdown(f"""
     <div class="proof-navbar">
-        <a href="{build_nav_url('home')}" target="_top" class="proof-navbar-logo" style="text-decoration: none;">
+        <a href="{build_nav_url('home')}" target="_parent" class="proof-navbar-logo" style="text-decoration: none;">
             {logo_img}
         </a>
         <div class="proof-navbar-nav">
-            <a href="{build_nav_url('photo')}" target="_top" class="proof-navbar-link {photo_active}">Photo</a>
-            <a href="{build_nav_url('video')}" target="_top" class="proof-navbar-link {video_active}">Video</a>
+            <a href="{build_nav_url('photo')}" target="_parent" class="proof-navbar-link {photo_active}">Photo</a>
+            <a href="{build_nav_url('video')}" target="_parent" class="proof-navbar-link {video_active}">Video</a>
             <div class="proof-dropdown">
                 <span class="proof-navbar-link {sort_active}">Auto Sort ▾</span>
                 <div class="proof-dropdown-content">
-                    <a href="{build_nav_url('photo_sort')}" target="_top" class="proof-dropdown-item">Photo</a>
-                    <a href="{build_nav_url('video_sort')}" target="_top" class="proof-dropdown-item">Video</a>
+                    <a href="{build_nav_url('photo_sort')}" target="_parent" class="proof-dropdown-item">Photo</a>
+                    <a href="{build_nav_url('video_sort')}" target="_parent" class="proof-dropdown-item">Video</a>
                 </div>
             </div>
         </div>
@@ -13435,12 +13435,12 @@ def main():
                 <div class="proof-user-dropdown-content">
                     <div style="background: {theme['bg_secondary']}; border: 1px solid {theme['border']}; border-radius: 8px; padding: 8px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
                         {admin_link_html}
-                        <a href="?action=signout&clear_storage=1" target="_top" style="display: block; padding: 10px 16px; color: {theme['text']}; text-decoration: none; font-size: 13px; font-weight: 500;">Sign Out</a>
+                        <a href="?action=signout&clear_storage=1" target="_parent" style="display: block; padding: 10px 16px; color: {theme['text']}; text-decoration: none; font-size: 13px; font-weight: 500;">Sign Out</a>
                     </div>
                 </div>
             </div>
             <span style="color: {theme['text_muted']}; font-size: 11px; font-weight: 600; letter-spacing: 1px;">BETA</span>
-            <a href="{build_theme_url('light' if is_dark else 'dark')}" target="_top" style="text-decoration: none; display: block; margin-left: 12px;">
+            <a href="{build_theme_url('light' if is_dark else 'dark')}" target="_parent" style="text-decoration: none; display: block; margin-left: 12px;">
                 <div class="proof-toggle" style="background: {theme['bg_secondary']}; border: 1px solid {theme['border']}; width: 48px; height: 26px; border-radius: 13px; position: relative; cursor: pointer;">
                     <div style="position: absolute; top: 2px; left: {knob_left}; width: 20px; height: 20px; border-radius: 50%; background: {'#FFFFFF' if is_dark else '#000000'}; transition: left 0.3s ease;"></div>
                 </div>
