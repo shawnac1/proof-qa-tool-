@@ -967,36 +967,72 @@ def get_dropbox_download_link(shared_link: str, file_path: str, dbx_client=None)
         return None
 
 # ============================================================================
-# AERIAL CANVAS BRAND COLORS (from webflow-SQUAD.txt)
+# PROOF DESIGN SYSTEM - Premium SaaS (Uber-inspired)
 # ============================================================================
 
-# Primary brand colors
-BRAND_ACCENT = "#7B8CDE"       # Primary accent (purple/periwinkle)
-BRAND_ACCENT_HOVER = "#9BA8E8" # Accent hover state
-BRAND_ACCENT_GLOW = "rgba(123,140,222,0.15)"  # Accent with transparency
+# Light Mode (Default) - Clean, professional, inviting
+LIGHT_MODE = {
+    "bg": "#FFFFFF",              # Pure white background
+    "bg_secondary": "#F7F7F7",    # Subtle gray for sections
+    "card": "#FFFFFF",            # White cards
+    "card_hover": "#FAFAFA",      # Card hover state
+    "border": "#E5E5E5",          # Light gray borders
+    "border_strong": "#D4D4D4",   # Stronger borders
+    "text": "#000000",            # Pure black text
+    "text_secondary": "#6B6B6B",  # Gray text
+    "text_muted": "#9CA3AF",      # Muted text
+    "accent": "#000000",          # Black accent (buttons, links)
+    "accent_hover": "#333333",    # Accent hover
+    "success": "#06C167",         # Uber green for success
+    "error": "#E11900",           # Red for errors
+    "warning": "#FF9500",         # Orange for warnings
+    "navbar": "#FFFFFF",          # White navbar
+    "navbar_border": "#E5E5E5",   # Navbar border
+}
 
-# Background colors
-BRAND_BG = "#000"              # Primary background (black)
-BRAND_BG2 = "#0a0a0a"          # Secondary background
-BRAND_CARD = "#111"            # Card background
-BRAND_CARD2 = "#161616"        # Card secondary
+# Dark Mode - Sleek, modern, easy on eyes
+DARK_MODE = {
+    "bg": "#000000",              # Pure black background
+    "bg_secondary": "#111111",    # Slightly lighter black
+    "card": "#161616",            # Dark gray cards
+    "card_hover": "#1C1C1C",      # Card hover state
+    "border": "#2D2D2D",          # Dark borders
+    "border_strong": "#404040",   # Stronger borders
+    "text": "#FFFFFF",            # Pure white text
+    "text_secondary": "#A1A1A1",  # Gray text
+    "text_muted": "#6B6B6B",      # Muted text
+    "accent": "#FFFFFF",          # White accent
+    "accent_hover": "#E5E5E5",    # Accent hover
+    "success": "#06C167",         # Green stays same
+    "error": "#FF4D4D",           # Brighter red for dark
+    "warning": "#FFB800",         # Brighter orange for dark
+    "navbar": "#000000",          # Black navbar
+    "navbar_border": "#2D2D2D",   # Navbar border
+}
 
-# Text colors
-BRAND_TEXT = "#fff"            # Primary text (white)
-BRAND_TEXT2 = "#a1a1aa"        # Secondary text (muted)
-BRAND_TEXT3 = "#71717a"        # Tertiary text (more muted)
+def get_theme_colors():
+    """Get current theme colors based on dark mode setting"""
+    if st.session_state.get('dark_mode', False):
+        return DARK_MODE
+    return LIGHT_MODE
 
-# Border
-BRAND_BORDER = "#1d1d1f"       # Border color
-
-# Status colors (for pass/fail/warning - kept for clarity)
-BRAND_GREEN = "#4ade80"        # Pass/success
-BRAND_RED = "#ef4444"          # Fail/error
-BRAND_YELLOW = "#f59e0b"       # Warning
-
-# Aliases for backward compatibility
-BRAND_PURPLE = BRAND_ACCENT
-BRAND_GRAY = BRAND_TEXT2
+# Legacy color aliases (for backward compatibility during transition)
+BRAND_ACCENT = "#000000"
+BRAND_ACCENT_HOVER = "#333333"
+BRAND_ACCENT_GLOW = "rgba(0,0,0,0.1)"
+BRAND_BG = "#FFFFFF"
+BRAND_BG2 = "#F7F7F7"
+BRAND_CARD = "#FFFFFF"
+BRAND_CARD2 = "#FAFAFA"
+BRAND_TEXT = "#000000"
+BRAND_TEXT2 = "#6B6B6B"
+BRAND_TEXT3 = "#9CA3AF"
+BRAND_BORDER = "#E5E5E5"
+BRAND_GREEN = "#06C167"
+BRAND_RED = "#E11900"
+BRAND_YELLOW = "#FF9500"
+BRAND_PURPLE = "#000000"
+BRAND_GRAY = "#6B6B6B"
 
 # Custom SVG icons in brand colors
 ICONS = {
@@ -1359,13 +1395,21 @@ ICONS = {
 }
 
 def icon(name: str, size: int = None) -> str:
-    """Get an SVG icon by name, optionally resized"""
+    """Get an SVG icon by name, optionally resized.
+    Neutral icons (not pass/fail/warning) are wrapped for theme-aware inversion."""
     svg = ICONS.get(name, ICONS['info'])
     if size:
         svg = svg.replace('width="24"', f'width="{size}"').replace('height="24"', f'height="{size}"')
         svg = svg.replace('width="20"', f'width="{size}"').replace('height="20"', f'height="{size}"')
         svg = svg.replace('width="16"', f'width="{size}"').replace('height="16"', f'height="{size}"')
         svg = svg.replace('width="14"', f'width="{size}"').replace('height="14"', f'height="{size}"')
+
+    # Icons that should NOT be inverted (they have specific colors)
+    colored_icons = {'pass', 'fail', 'warning', 'check', 'x', 'thumbs_up', 'thumbs_down'}
+
+    if name not in colored_icons:
+        # Wrap neutral icons so CSS can invert them in dark mode
+        return f'<span class="proof-icon">{svg}</span>'
     return svg
 
 
@@ -2139,7 +2183,8 @@ stats_tracker = StatsTracker()
 # ============================================================================
 
 def render_footer():
-    """Render the stats footer - shown on all pages"""
+    """Render the sticky stats footer - shown on all pages"""
+    theme = get_theme_colors()
     all_stats = stats_tracker.get_all_stats()
     total_files = (all_stats.get('total_photos_analyzed', 0) +
                    all_stats.get('total_videos_analyzed', 0) +
@@ -2147,23 +2192,24 @@ def render_footer():
     total_issues = all_stats.get('total_issues_found', 0)
     time_saved = stats_tracker.format_time_saved()
 
+    # Sticky footer at bottom of viewport
     st.markdown(f"""
-    <div style="border-top: 1px solid #1d1d1f; margin-top: 60px; padding: 30px 20px;">
-        <div style="display: flex; justify-content: center; gap: 40px; margin-bottom: 16px;">
-            <div style="text-align: center;">
-                <div style="font-size: 24px; font-weight: 700; color: #7B8CDE;">{total_files:,}</div>
-                <div style="font-size: 11px; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em;">Files Analyzed</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 24px; font-weight: 700; color: #7B8CDE;">{total_issues:,}</div>
-                <div style="font-size: 11px; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em;">Issues Found</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 24px; font-weight: 700; color: #7B8CDE;">{time_saved}</div>
-                <div style="font-size: 11px; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em;">Time Saved</div>
-            </div>
+    <div class="proof-footer">
+        <div class="proof-footer-stat">
+            <div class="proof-footer-stat-value">{total_files:,}</div>
+            <div class="proof-footer-stat-label">Files Analyzed</div>
         </div>
-        <p style="text-align: center; font-size: 11px; color: #71717a !important; letter-spacing: 0.05em;">Proof by Aerial Canvas · Beta v2.8</p>
+        <div class="proof-footer-stat">
+            <div class="proof-footer-stat-value">{total_issues:,}</div>
+            <div class="proof-footer-stat-label">Issues Found</div>
+        </div>
+        <div class="proof-footer-stat">
+            <div class="proof-footer-stat-value">{time_saved}</div>
+            <div class="proof-footer-stat-label">Time Saved</div>
+        </div>
+        <div class="proof-footer-brand">
+            Proof by Aerial Canvas · Beta v2.8
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -2203,7 +2249,7 @@ def show_login_page():
 
     st.markdown("""
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 50vh; text-align: center;">
-        <h1 style="font-size: 48px; color: #7B8CDE !important; margin-bottom: 16px;">Proof</h1>
+        <h1 style="font-size: 48px; color: #000000 !important; margin-bottom: 16px;">Proof</h1>
         <p style="color: #a1a1aa; font-size: 18px; margin-bottom: 8px;">by Aerial Canvas</p>
         <p style="color: #71717a; font-size: 14px; margin-bottom: 40px;">Automated QA for video and photo deliverables</p>
     </div>
@@ -2310,11 +2356,11 @@ def show_waitlist_page(user_info: dict):
 
     st.markdown(f"""
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; text-align: center;">
-        <h1 style="font-size: 36px; color: #7B8CDE !important; margin-bottom: 16px;">You're on the list!</h1>
+        <h1 style="font-size: 36px; color: #000000 !important; margin-bottom: 16px;">You're on the list!</h1>
         <p style="color: #a1a1aa; font-size: 16px; margin-bottom: 8px;">Thanks for your interest in Proof by Aerial Canvas.</p>
         <p style="color: #71717a; font-size: 14px; margin-bottom: 32px;">
             We're currently in private beta with the Aerial Canvas team.<br>
-            We'll notify you at <span style="color: #7B8CDE;">{email}</span> when we open up access.
+            We'll notify you at <span style="color: #000000;">{email}</span> when we open up access.
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -6898,7 +6944,7 @@ def display_report(report: QAReport, show_feedback: bool = True):
                     if issue.preview_image:
                         st.markdown("**Preview:**")
                         st.markdown(f'''
-                            <div style="border: 2px solid #7B8CDE; border-radius: 8px; overflow: hidden; margin: 8px 0;">
+                            <div style="border: 2px solid #000000; border-radius: 8px; overflow: hidden; margin: 8px 0;">
                                 <img src="data:image/jpeg;base64,{issue.preview_image}" style="width: 100%; display: block;">
                             </div>
                         ''', unsafe_allow_html=True)
@@ -8954,64 +9000,44 @@ def scan_folder_for_clips(folder_path: str) -> List[Dict]:
     return clips
 
 
-def display_auto_sort():
+def display_auto_sort(sort_type="Video"):
     """
     Auto Sort feature - analyzes raw footage and generates edit-ready XML:
     1. Connects to Dropbox folder with raw clips
     2. Analyzes each clip to identify room type (bedroom, bathroom, kitchen, etc.)
     3. Finds the best moments in each clip (stability, exposure, composition)
     4. Generates XML timeline for DaVinci Resolve, Premiere Pro, or Final Cut Pro X
+
+    Args:
+        sort_type: "Video" or "Photos" - determines which sort mode to display
     """
 
+    # Get theme colors
+    theme = get_theme_colors()
+
     # Auto Sort icon (folder with magic wand)
-    auto_sort_icon = '''<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#7B8CDE" stroke-width="2">
+    icon_color = theme['text']
+    auto_sort_icon = f'''<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="{icon_color}" stroke-width="2">
         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-        <path d="M12 11v6M9 14l3-3 3 3" stroke="#7B8CDE" stroke-width="2"></path>
+        <path d="M12 11v6M9 14l3-3 3 3" stroke="{icon_color}" stroke-width="2"></path>
     </svg>'''
 
-    # Initialize sort mode in session state
-    if 'auto_sort_mode' not in st.session_state:
-        st.session_state.auto_sort_mode = 'Video'
+    # Page title based on sort type
+    page_title = "Photo Sort" if sort_type == "Photos" else "Video Sort"
+    page_subtitle = "Organize & rename photos by room type for delivery" if sort_type == "Photos" else "Organize raw footage and generate edit-ready XML"
 
     st.markdown(f"""
     <div style="text-align: center; margin-bottom: 20px;">
         <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 8px;">
             {auto_sort_icon}
-            <h2 style="color: #fff; margin: 0;">Auto Sort</h2>
+            <h2 style="color: {theme['text']}; margin: 0;">{page_title}</h2>
         </div>
-        <p style="color: #a1a1aa; font-size: 14px; margin-bottom: 16px;">Organize & rename files by room type for delivery</p>
+        <p style="color: {theme['text_secondary']}; font-size: 14px; margin-bottom: 16px;">{page_subtitle}</p>
     </div>
     """, unsafe_allow_html=True)
 
-    # Centered mode selector buttons
-    _, btn_col1, btn_col2, _ = st.columns([1.5, 1, 1, 1.5])
-
-    with btn_col1:
-        video_selected = st.session_state.auto_sort_mode == 'Video'
-        if st.button(
-            "Video",
-            key="sort_mode_video",
-            type="primary" if video_selected else "secondary",
-            use_container_width=True
-        ):
-            st.session_state.auto_sort_mode = 'Video'
-            st.rerun()
-
-    with btn_col2:
-        photos_selected = st.session_state.auto_sort_mode == 'Photos'
-        if st.button(
-            "Photos",
-            key="sort_mode_photos",
-            type="primary" if photos_selected else "secondary",
-            use_container_width=True
-        ):
-            st.session_state.auto_sort_mode = 'Photos'
-            st.rerun()
-
-    st.markdown("<div style='margin-bottom: 24px;'></div>", unsafe_allow_html=True)
-
-    # Get current mode
-    sort_mode = st.session_state.auto_sort_mode
+    # Use the passed sort_type directly (no more toggle buttons)
+    sort_mode = sort_type
 
     # =============================================
     # PHOTO SORTING MODE
@@ -9020,20 +9046,20 @@ def display_auto_sort():
         # Feature overview cards for PHOTOS
         st.markdown(f"""
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px;">
-            <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 20px; text-align: center;">
+            <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 20px; text-align: center;">
                 <div style="margin-bottom: 8px;">{icon('room_detection', 28)}</div>
-                <div style="color: #fff; font-weight: 600; margin-bottom: 4px;">Room Detection</div>
-                <div style="color: #71717a; font-size: 12px;">AI identifies each room type</div>
+                <div style="color: {theme['text']}; font-weight: 600; margin-bottom: 4px;">Room Detection</div>
+                <div style="color: {theme['text_muted']}; font-size: 12px;">AI identifies each room type</div>
             </div>
-            <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 20px; text-align: center;">
+            <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 20px; text-align: center;">
                 <div style="margin-bottom: 8px;">{icon('folder', 28)}</div>
-                <div style="color: #fff; font-weight: 600; margin-bottom: 4px;">Auto Order</div>
-                <div style="color: #71717a; font-size: 12px;">Standard delivery sequence</div>
+                <div style="color: {theme['text']}; font-weight: 600; margin-bottom: 4px;">Auto Order</div>
+                <div style="color: {theme['text_muted']}; font-size: 12px;">Standard delivery sequence</div>
             </div>
-            <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 20px; text-align: center;">
+            <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 20px; text-align: center;">
                 <div style="margin-bottom: 8px;">{icon('file', 28)}</div>
-                <div style="color: #fff; font-weight: 600; margin-bottom: 4px;">Rename</div>
-                <div style="color: #71717a; font-size: 12px;">Photo-1, Photo-2, Drone-1...</div>
+                <div style="color: {theme['text']}; font-weight: 600; margin-bottom: 4px;">Rename</div>
+                <div style="color: {theme['text_muted']}; font-size: 12px;">Photo-1, Photo-2, Drone-1...</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -9044,9 +9070,9 @@ def display_auto_sort():
                     border-radius: 12px; padding: 16px; margin-bottom: 20px;">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
                 {icon('info', 16)}
-                <span style="color: #fff; font-weight: 600; font-size: 14px;">Standard Photo Delivery Order</span>
+                <span style="color: {theme['text']}; font-weight: 600; font-size: 14px;">Standard Photo Delivery Order</span>
             </div>
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 12px; color: #a1a1aa;">
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 12px; color: {theme['text_secondary']};">
                 <div>1. Front of home / front patio</div>
                 <div>6. Kitchen</div>
                 <div>2. Entryway</div>
@@ -9058,7 +9084,7 @@ def display_auto_sort():
                 <div>5. Family room</div>
                 <div>10. Back of home / backyard / ADU</div>
             </div>
-            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(123, 140, 222, 0.2); color: #71717a; font-size: 11px;">
+            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(123, 140, 222, 0.2); color: {theme['text_muted']}; font-size: 11px;">
                 Naming: Photo-1, Photo-2... | Drone-1, Drone-2... | Twilight-1, Twilight-2...
             </div>
         </div>
@@ -9066,12 +9092,12 @@ def display_auto_sort():
 
         # How it Works section for Photos
         st.markdown(f"""
-        <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+        <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
                 {icon('info', 18)}
-                <span style="color: #fff; font-weight: 600; font-size: 15px;">How it Works</span>
+                <span style="color: {theme['text']}; font-weight: 600; font-size: 15px;">How it Works</span>
             </div>
-            <ol style="color: #a1a1aa; font-size: 13px; margin: 0; padding-left: 20px; line-height: 1.8;">
+            <ol style="color: {theme['text_secondary']}; font-size: 13px; margin: 0; padding-left: 20px; line-height: 1.8;">
                 <li>Paste your Dropbox folder link containing photos</li>
                 <li>AI analyzes each image to detect the room type</li>
                 <li>Photos are automatically sorted into standard delivery order</li>
@@ -9080,48 +9106,99 @@ def display_auto_sort():
         </div>
         """, unsafe_allow_html=True)
 
-        # Intelligent Room Detection breakdown
+        # Intelligent Room Detection breakdown - 5 columns x 2 rows = 10 items
         st.markdown(f"""
-        <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+        <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
                 {icon('room_detection', 18)}
-                <span style="color: #fff; font-weight: 600; font-size: 15px;">Intelligent Room Detection</span>
+                <span style="color: {theme['text']}; font-weight: 600; font-size: 15px;">Intelligent Room Detection</span>
             </div>
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px;">
                 <div style="background: rgba(123, 140, 222, 0.1); border-radius: 8px; padding: 10px; text-align: center;">
-                    <div style="color: #7B8CDE; font-size: 11px; font-weight: 600;">EXTERIOR</div>
-                    <div style="color: #a1a1aa; font-size: 10px; margin-top: 4px;">Front · Rear</div>
+                    <div style="color: {theme['text']}; font-size: 11px; font-weight: 600;">EXTERIOR</div>
+                    <div style="color: {theme['text_muted']}; font-size: 10px; margin-top: 4px;">Front · Rear</div>
                 </div>
                 <div style="background: rgba(123, 140, 222, 0.1); border-radius: 8px; padding: 10px; text-align: center;">
-                    <div style="color: #7B8CDE; font-size: 11px; font-weight: 600;">LIVING SPACES</div>
-                    <div style="color: #a1a1aa; font-size: 10px; margin-top: 4px;">Living · Dining · Family</div>
+                    <div style="color: {theme['text']}; font-size: 11px; font-weight: 600;">ENTRY</div>
+                    <div style="color: {theme['text_muted']}; font-size: 10px; margin-top: 4px;">Foyer · Hallway · Stairs</div>
                 </div>
                 <div style="background: rgba(123, 140, 222, 0.1); border-radius: 8px; padding: 10px; text-align: center;">
-                    <div style="color: #7B8CDE; font-size: 11px; font-weight: 600;">KITCHEN</div>
-                    <div style="color: #a1a1aa; font-size: 10px; margin-top: 4px;">Kitchen · Pantry</div>
+                    <div style="color: {theme['text']}; font-size: 11px; font-weight: 600;">LIVING SPACES</div>
+                    <div style="color: {theme['text_muted']}; font-size: 10px; margin-top: 4px;">Living · Dining · Family</div>
                 </div>
                 <div style="background: rgba(123, 140, 222, 0.1); border-radius: 8px; padding: 10px; text-align: center;">
-                    <div style="color: #7B8CDE; font-size: 11px; font-weight: 600;">BEDROOMS</div>
-                    <div style="color: #a1a1aa; font-size: 10px; margin-top: 4px;">Primary · Secondary</div>
+                    <div style="color: {theme['text']}; font-size: 11px; font-weight: 600;">KITCHEN</div>
+                    <div style="color: {theme['text_muted']}; font-size: 10px; margin-top: 4px;">Kitchen · Pantry</div>
                 </div>
                 <div style="background: rgba(123, 140, 222, 0.1); border-radius: 8px; padding: 10px; text-align: center;">
-                    <div style="color: #7B8CDE; font-size: 11px; font-weight: 600;">BATHROOMS</div>
-                    <div style="color: #a1a1aa; font-size: 10px; margin-top: 4px;">Full · Half · Primary</div>
+                    <div style="color: {theme['text']}; font-size: 11px; font-weight: 600;">BEDROOMS</div>
+                    <div style="color: {theme['text_muted']}; font-size: 10px; margin-top: 4px;">Primary · Secondary</div>
                 </div>
                 <div style="background: rgba(123, 140, 222, 0.1); border-radius: 8px; padding: 10px; text-align: center;">
-                    <div style="color: #7B8CDE; font-size: 11px; font-weight: 600;">UTILITY</div>
-                    <div style="color: #a1a1aa; font-size: 10px; margin-top: 4px;">Laundry · Garage · Office</div>
+                    <div style="color: {theme['text']}; font-size: 11px; font-weight: 600;">BATHROOMS</div>
+                    <div style="color: {theme['text_muted']}; font-size: 10px; margin-top: 4px;">Full · Half · Primary</div>
                 </div>
                 <div style="background: rgba(123, 140, 222, 0.1); border-radius: 8px; padding: 10px; text-align: center;">
-                    <div style="color: #7B8CDE; font-size: 11px; font-weight: 600;">OUTDOOR</div>
-                    <div style="color: #a1a1aa; font-size: 10px; margin-top: 4px;">Yard · Pool · Patio</div>
+                    <div style="color: {theme['text']}; font-size: 11px; font-weight: 600;">UTILITY</div>
+                    <div style="color: {theme['text_muted']}; font-size: 10px; margin-top: 4px;">Laundry · Garage · Office</div>
                 </div>
                 <div style="background: rgba(123, 140, 222, 0.1); border-radius: 8px; padding: 10px; text-align: center;">
-                    <div style="color: #7B8CDE; font-size: 11px; font-weight: 600;">SPECIAL</div>
-                    <div style="color: #a1a1aa; font-size: 10px; margin-top: 4px;">ADU · Drone · Detail</div>
+                    <div style="color: {theme['text']}; font-size: 11px; font-weight: 600;">OUTDOOR</div>
+                    <div style="color: {theme['text_muted']}; font-size: 10px; margin-top: 4px;">Yard · Pool · Patio</div>
+                </div>
+                <div style="background: rgba(123, 140, 222, 0.1); border-radius: 8px; padding: 10px; text-align: center;">
+                    <div style="color: {theme['text']}; font-size: 11px; font-weight: 600;">SPECIAL</div>
+                    <div style="color: {theme['text_muted']}; font-size: 10px; margin-top: 4px;">ADU · Drone · Detail</div>
+                </div>
+                <div style="background: rgba(123, 140, 222, 0.1); border-radius: 8px; padding: 10px; text-align: center;">
+                    <div style="color: {theme['text']}; font-size: 11px; font-weight: 600;">FEATURES</div>
+                    <div style="color: {theme['text_muted']}; font-size: 10px; margin-top: 4px;">Views · Closets · Amenities</div>
                 </div>
             </div>
         </div>
+        """, unsafe_allow_html=True)
+
+        # Theme-aware CSS for Photo Sort inputs and buttons
+        # Light mode: light gray button with black text (matching other buttons)
+        is_light = theme['bg'] == '#FFFFFF'
+        btn_bg = '#F5F5F5' if is_light else theme['card']
+        btn_text = '#000000' if is_light else '#FFFFFF'
+        btn_hover = '#E0E0E0' if is_light else theme['card_hover']
+        placeholder_color = '#000000' if is_light else theme['text_muted']
+
+        st.markdown(f"""
+        <style>
+        /* Photo Sort text input styling */
+        [data-testid="stTextInput"] input {{
+            background: {theme['card']} !important;
+            color: {theme['text']} !important;
+            border: 1px solid {theme['border']} !important;
+            border-radius: 8px !important;
+        }}
+        [data-testid="stTextInput"] input::placeholder {{
+            color: {placeholder_color} !important;
+        }}
+        [data-testid="stTextInput"] input:focus {{
+            border-color: {theme['text']} !important;
+            box-shadow: none !important;
+        }}
+        /* Photo Sort primary button styling - light gray in light mode */
+        .stButton > button[kind="primary"] {{
+            background: {btn_bg} !important;
+            color: {btn_text} !important;
+            border: none !important;
+            border-radius: 8px !important;
+            font-weight: 600 !important;
+        }}
+        .stButton > button[kind="primary"]:hover {{
+            background: {btn_hover} !important;
+            color: {btn_text} !important;
+        }}
+        .stButton > button[kind="primary"] p,
+        .stButton > button[kind="primary"] span {{
+            color: {btn_text} !important;
+        }}
+        </style>
         """, unsafe_allow_html=True)
 
         # Dropbox input for photos
@@ -9143,7 +9220,7 @@ def display_auto_sort():
             status_text = st.empty()
 
             status_text.markdown("""
-            <div style="color: #7B8CDE; font-size: 13px;">Downloading folder from Dropbox...</div>
+            <div style="color: #000000; font-size: 13px;">Downloading folder from Dropbox...</div>
             """, unsafe_allow_html=True)
             progress_bar.progress(0.1)
 
@@ -9162,7 +9239,7 @@ def display_auto_sort():
                     st.warning("Please provide a folder link (not a single file)")
                 else:
                     status_text.markdown("""
-                    <div style="color: #7B8CDE; font-size: 13px;">Extracting photos...</div>
+                    <div style="color: #000000; font-size: 13px;">Extracting photos...</div>
                     """, unsafe_allow_html=True)
                     progress_bar.progress(0.2)
 
@@ -9174,7 +9251,7 @@ def display_auto_sort():
                         st.warning("No photos found in folder")
                     else:
                         status_text.markdown(f"""
-                        <div style="color: #7B8CDE; font-size: 13px;">Analyzing {len(photo_paths)} photos...</div>
+                        <div style="color: #000000; font-size: 13px;">Analyzing {len(photo_paths)} photos...</div>
                         """, unsafe_allow_html=True)
 
                         # Analyze each photo to detect room type
@@ -9199,7 +9276,7 @@ def display_auto_sort():
 
                         # Sort photos
                         status_text.markdown("""
-                        <div style="color: #7B8CDE; font-size: 13px;">Sorting photos...</div>
+                        <div style="color: #000000; font-size: 13px;">Sorting photos...</div>
                         """, unsafe_allow_html=True)
                         progress_bar.progress(0.9)
 
@@ -9635,23 +9712,70 @@ def display_auto_sort():
     # =============================================
     # VIDEO SORTING MODE (Default)
     # =============================================
+
+    # Theme-aware CSS for Video Sort inputs and buttons
+    is_light = theme['bg'] == '#FFFFFF'
+    btn_bg = '#F5F5F5' if is_light else theme['card']
+    btn_text = '#000000' if is_light else '#FFFFFF'
+    btn_hover = '#E0E0E0' if is_light else theme['card_hover']
+    placeholder_color = '#000000' if is_light else theme['text_muted']
+
+    st.markdown(f"""
+    <style>
+    /* Video Sort text input styling */
+    [data-testid="stTextInput"] input {{
+        background: {theme['card']} !important;
+        color: {theme['text']} !important;
+        border: 1px solid {theme['border']} !important;
+        border-radius: 8px !important;
+    }}
+    [data-testid="stTextInput"] input::placeholder {{
+        color: {placeholder_color} !important;
+    }}
+    [data-testid="stTextInput"] input:focus {{
+        border-color: {theme['text']} !important;
+        box-shadow: none !important;
+    }}
+    /* Video Sort button styling - light gray in light mode */
+    .stButton > button[kind="primary"] {{
+        background: {btn_bg} !important;
+        color: {btn_text} !important;
+        border: none !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+    }}
+    .stButton > button[kind="primary"]:hover {{
+        background: {btn_hover} !important;
+        color: {btn_text} !important;
+    }}
+    .stButton > button[kind="primary"] p,
+    .stButton > button[kind="primary"] span {{
+        color: {btn_text} !important;
+    }}
+    /* Radio buttons styling */
+    [data-testid="stRadio"] label {{
+        color: {theme['text']} !important;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+
     # Feature overview cards for VIDEO
     st.markdown(f"""
     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 30px;">
-        <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 20px; text-align: center;">
+        <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 20px; text-align: center;">
             <div style="margin-bottom: 8px;">{icon('room_detection', 28)}</div>
-            <div style="color: #fff; font-weight: 600; margin-bottom: 4px;">Room Detection</div>
-            <div style="color: #71717a; font-size: 12px;">Kitchen, bedroom, bathroom, living room, exterior, drone</div>
+            <div style="color: {theme['text']}; font-weight: 600; margin-bottom: 4px;">Room Detection</div>
+            <div style="color: {theme['text_muted']}; font-size: 12px;">Kitchen, bedroom, bathroom, living room, exterior, drone</div>
         </div>
-        <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 20px; text-align: center;">
+        <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 20px; text-align: center;">
             <div style="margin-bottom: 8px;">{icon('best_moments', 28)}</div>
-            <div style="color: #fff; font-weight: 600; margin-bottom: 4px;">Best Moments</div>
-            <div style="color: #71717a; font-size: 12px;">Finds smoothest, best-exposed sections of each clip</div>
+            <div style="color: {theme['text']}; font-weight: 600; margin-bottom: 4px;">Best Moments</div>
+            <div style="color: {theme['text_muted']}; font-size: 12px;">Finds smoothest, best-exposed sections of each clip</div>
         </div>
-        <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 20px; text-align: center;">
+        <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 20px; text-align: center;">
             <div style="margin-bottom: 8px;">{icon('xml_export', 28)}</div>
-            <div style="color: #fff; font-weight: 600; margin-bottom: 4px;">XML Export</div>
-            <div style="color: #71717a; font-size: 12px;">DaVinci Resolve, Premiere Pro, Final Cut Pro X</div>
+            <div style="color: {theme['text']}; font-weight: 600; margin-bottom: 4px;">XML Export</div>
+            <div style="color: {theme['text_muted']}; font-size: 12px;">DaVinci Resolve, Premiere Pro, Final Cut Pro X</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -9669,11 +9793,11 @@ def display_auto_sort():
         st.session_state.dropbox_shared_link = ''
 
     # Input method tabs
-    st.markdown("### Select Footage Source")
+    st.markdown(f"<h3 style='color: {theme['text']};'>Select Footage Source</h3>", unsafe_allow_html=True)
 
     input_method = st.radio(
         "Input method",
-        ["Dropbox Shared Link", "Upload Files", "Local Folder Path"],
+        ["Dropbox Shared Link", "Upload Files"],
         horizontal=True,
         label_visibility="collapsed"
     )
@@ -9697,13 +9821,13 @@ def display_auto_sort():
                     if len(errors) > 20:
                         st.info(f"... and {len(errors) - 20} more")
 
-            st.markdown("""
+            st.markdown(f"""
             <div style="background: rgba(74, 222, 128, 0.1); border: 1px solid rgba(74, 222, 128, 0.3);
                         border-radius: 12px; padding: 20px; margin: 20px 0;">
                 <div style="color: #4ade80; font-size: 18px; font-weight: 700; margin-bottom: 8px;">
                     Review & Edit Room Assignments
                 </div>
-                <div style="color: #a1a1aa; font-size: 13px;">
+                <div style="color: {theme['text_secondary']}; font-size: 13px;">
                     Analysis complete! Review the detected room types below. Fix any incorrect ones, then click "Create Organized Folder".
                 </div>
             </div>
@@ -9785,8 +9909,8 @@ def display_auto_sort():
             st.markdown("""
             <div style="background: rgba(123, 140, 222, 0.1); border: 1px solid rgba(123, 140, 222, 0.3);
                         border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-                <div style="color: #7B8CDE; font-weight: 600; margin-bottom: 8px;">One-Click Workflow</div>
-                <ol style="color: #a1a1aa; font-size: 13px; margin: 0; padding-left: 20px;">
+                <div style="color: {theme['text']}; font-weight: 600; margin-bottom: 8px;">One-Click Workflow</div>
+                <ol style="color: {theme['text_secondary']}; font-size: 13px; margin: 0; padding-left: 20px;">
                     <li>Paste your Dropbox folder link</li>
                     <li>Choose where to save (Desktop, etc.)</li>
                     <li>Click "Go" - we handle the rest</li>
@@ -10185,7 +10309,7 @@ def display_auto_sort():
                     st.markdown("""
                     <div style="background: rgba(123, 140, 222, 0.1); border: 1px solid rgba(123, 140, 222, 0.3);
                                 border-radius: 12px; padding: 20px; margin: 20px 0;">
-                        <div style="color: #7B8CDE; font-size: 18px; font-weight: 700; margin-bottom: 8px;">
+                        <div style="color: #000000; font-size: 18px; font-weight: 700; margin-bottom: 8px;">
                             Review & Edit Room Assignments
                         </div>
                         <div style="color: #a1a1aa; font-size: 13px;">
@@ -11097,7 +11221,7 @@ def display_auto_sort():
         with col1:
             st.markdown(f"""
             <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 16px; text-align: center;">
-                <div style="font-size: 26px; font-weight: 700; color: #7B8CDE;">{len(st.session_state.auto_sort_clips)}</div>
+                <div style="font-size: 26px; font-weight: 700; color: #000000;">{len(st.session_state.auto_sort_clips)}</div>
                 <div style="font-size: 11px; color: #a1a1aa;">Total Clips</div>
             </div>
             """, unsafe_allow_html=True)
@@ -11404,7 +11528,7 @@ def display_auto_sort():
         <div style="background: rgba(123, 140, 222, 0.1); border: 1px solid rgba(123, 140, 222, 0.2);
                     border-radius: 8px; padding: 12px; margin-bottom: 16px;">
             <div style="color: #a1a1aa; font-size: 13px;">
-                <strong style="color: #7B8CDE;">Relink Path:</strong> The XML will reference files at the path you specify below.
+                <strong style="color: #000000;">Relink Path:</strong> The XML will reference files at the path you specify below.
                 Set this to your local Dropbox sync folder path so the NLE can find the files when you import.
             </div>
         </div>
@@ -11738,7 +11862,7 @@ def display_calibration_dashboard():
     with col1:
         st.markdown(f"""
         <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 20px; text-align: center;">
-            <div style="font-size: 32px; font-weight: 700; color: #7B8CDE;">{stats['total_feedback']}</div>
+            <div style="font-size: 32px; font-weight: 700; color: #000000;">{stats['total_feedback']}</div>
             <div style="font-size: 12px; color: #a1a1aa; margin-top: 4px;">Total Feedback</div>
         </div>
         """, unsafe_allow_html=True)
@@ -12037,7 +12161,7 @@ def display_file_browser():
                     status_text.markdown(f"""
                         <div style="display: flex; align-items: center; gap: 6px;">
                             {icon('clock', 12)}
-                            <span style="color: #7B8CDE; font-size: 12px;">{message}</span>
+                            <span style="color: #000000; font-size: 12px;">{message}</span>
                         </div>
                     """, unsafe_allow_html=True)
 
@@ -12088,11 +12212,697 @@ def display_file_browser():
             with col3:
                 st.metric("Bad Files", stats['file_ratings'].get('bad', 0))
 
+
+# ============================================================================
+# PROOF DESIGN SYSTEM v3.0 - Premium SaaS UI
+# ============================================================================
+
+def get_proof_css(theme: dict) -> str:
+    """Generate theme-aware CSS for Proof app"""
+    return f"""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+
+    /* ========== GLOBAL RESET ========== */
+    * {{
+        font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    }}
+    #MainMenu, footer, header {{ visibility: hidden; }}
+
+    /* ========== BACKGROUNDS ========== */
+    .stApp, .main, .block-container,
+    [data-testid="stAppViewContainer"],
+    [data-testid="stHeader"],
+    [data-testid="stToolbar"],
+    .stApp > header,
+    .stApp > div,
+    section[data-testid="stSidebar"],
+    div[data-testid="stDecoration"] {{
+        background: {theme['bg']} !important;
+        background-color: {theme['bg']} !important;
+    }}
+
+    .block-container {{
+        padding: 0 !important;
+        max-width: 100% !important;
+    }}
+
+    /* ========== NAVBAR ========== */
+    .proof-navbar {{
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 64px;
+        background: {theme['navbar']};
+        border-bottom: 1px solid {theme['border']};
+        display: flex;
+        align-items: center;
+        padding: 0 32px;
+        z-index: 1000;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }}
+    .proof-navbar-logo {{
+        font-size: 24px;
+        font-weight: 700;
+        color: {theme['text']};
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }}
+    .proof-navbar-logo img {{
+        height: 54px;
+        filter: {'invert(1)' if theme['bg'] == '#FFFFFF' else 'none'};
+    }}
+    .proof-navbar-nav {{
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-left: 40px;
+    }}
+    /* Override default link styles for navbar - ALL BLACK in light mode */
+    .proof-navbar a,
+    .proof-navbar a:visited,
+    .proof-navbar a:link,
+    .proof-navbar-link,
+    a.proof-navbar-link,
+    a.proof-dropdown-item {{
+        padding: 10px 20px;
+        font-size: 15px;
+        font-weight: 500;
+        color: {theme['text']} !important;
+        text-decoration: none !important;
+        border-radius: 8px;
+        transition: all 0.15s ease;
+        cursor: pointer;
+        border: none !important;
+        outline: none !important;
+    }}
+    .proof-navbar a:hover,
+    .proof-navbar-link:hover,
+    a.proof-navbar-link:hover {{
+        color: {theme['text']} !important;
+        background: {theme['bg_secondary']};
+        text-decoration: none !important;
+    }}
+    .proof-navbar-link.active,
+    a.proof-navbar-link.active {{
+        color: {theme['text']} !important;
+        background: {theme['bg_secondary']};
+        font-weight: 600;
+    }}
+    /* Dropdown for Auto Sort */
+    .proof-dropdown {{
+        position: relative;
+        display: inline-block;
+    }}
+    .proof-dropdown-content {{
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        background: {theme['card']};
+        min-width: 140px;
+        border: 1px solid {theme['border']};
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 1001;
+        margin-top: 4px;
+        overflow: hidden;
+    }}
+    .proof-dropdown:hover .proof-dropdown-content {{
+        display: block;
+    }}
+    .proof-dropdown-item,
+    a.proof-dropdown-item {{
+        display: block;
+        padding: 12px 16px !important;
+        font-size: 14px;
+        font-weight: 500;
+        color: {theme['text_secondary']} !important;
+        text-decoration: none !important;
+        cursor: pointer;
+        transition: all 0.1s ease;
+        border-radius: 0 !important;
+    }}
+    .proof-dropdown-item:hover,
+    a.proof-dropdown-item:hover {{
+        background: {theme['bg_secondary']};
+        color: {theme['text']} !important;
+    }}
+    .proof-navbar-right {{
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }}
+    /* Modern Toggle Switch */
+    .proof-toggle-container {{
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }}
+    .proof-toggle-label {{
+        font-size: 12px;
+        font-weight: 500;
+        color: {theme['text_muted']};
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }}
+    .proof-toggle {{
+        position: relative;
+        width: 48px;
+        height: 26px;
+        background: {theme['bg_secondary']};
+        border: 1px solid {theme['border']};
+        border-radius: 13px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }}
+    .proof-toggle:hover {{
+        border-color: {theme['border_strong']};
+    }}
+    .proof-toggle-knob {{
+        position: absolute;
+        top: 2px;
+        left: {'22px' if theme['bg'] == '#000000' else '2px'};
+        width: 20px;
+        height: 20px;
+        background: {'#FFFFFF' if theme['bg'] == '#000000' else '#000000'} !important;
+        border-radius: 50%;
+        transition: all 0.3s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }}
+    /* Icon inversion for dark/light mode - invert when dark background */
+    .proof-icon svg {{
+        filter: {'invert(1)' if theme['bg'] == '#000000' else 'none'};
+    }}
+
+    /* ========== LIGHT MODE OVERRIDES ========== */
+    {'''
+    /* AGGRESSIVE LIGHT MODE - Override ALL dark elements */
+
+    /* Any element with dark background colors */
+    [style*="background: #0"], [style*="background:#0"],
+    [style*="background: #1"], [style*="background:#1"],
+    [style*="background: rgb(0"], [style*="background: rgb(1"],
+    [style*="background-color: #0"], [style*="background-color:#0"],
+    [style*="background-color: #1"], [style*="background-color:#1"] {
+        background: #FFFFFF !important;
+        background-color: #FFFFFF !important;
+    }
+
+    /* Cards and containers - white bg with border */
+    .stMarkdown > div > div[style*="border-radius"] {
+        background: #FFFFFF !important;
+        border: 1px solid #E0E0E0 !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.06) !important;
+    }
+
+    /* All borders to light gray */
+    [style*="border"][style*="#1d1d1f"],
+    [style*="border"][style*="#2"],
+    [style*="border-color"][style*="#1"],
+    [style*="border-color"][style*="#2"] {
+        border-color: #E0E0E0 !important;
+    }
+
+    /* ALL text should be dark in light mode */
+    .stMarkdown, .stMarkdown *,
+    [data-testid="stMarkdownContainer"],
+    [data-testid="stMarkdownContainer"] * {
+        color: #000000 !important;
+    }
+
+    /* Specific overrides for muted text - make it readable but not pure black */
+    [style*="color: #71717a"], [style*="color:#71717a"],
+    [style*="color: #52525b"], [style*="color:#52525b"],
+    [style*="color: #a1a1aa"], [style*="color:#a1a1aa"],
+    [style*="text-transform: uppercase"] {
+        color: #4B5563 !important;
+    }
+
+    /* White/light text to black */
+    [style*="color: #fff"], [style*="color:#fff"],
+    [style*="color: white"], [style*="color: #f"],
+    [style*="color: #e"], [style*="color:#e"] {
+        color: #000000 !important;
+    }
+
+    /* SVG icons - make them black in light mode */
+    svg {
+        color: #000000 !important;
+    }
+    svg path, svg circle, svg rect, svg line, svg polyline, svg polygon {
+        stroke: #000000 !important;
+    }
+    /* Keep colored icons (pass/fail/warning) their original colors */
+    svg[stroke="#06C167"] path, svg[stroke="#06C167"] * { stroke: #06C167 !important; }
+    svg[stroke="#E11900"] path, svg[stroke="#E11900"] * { stroke: #E11900 !important; }
+    svg[stroke="#FF9500"] path, svg[stroke="#FF9500"] * { stroke: #FF9500 !important; }
+
+    /* Progress bar backgrounds */
+    [style*="background: #1d1d1f"], [style*="background:#1d1d1f"],
+    [style*="background: #2"], [style*="background:#2"] {
+        background: #E5E5E5 !important;
+    }
+
+    /* Metric cards */
+    [data-testid="stMetric"], [data-testid="stMetric"] * {
+        color: #000000 !important;
+    }
+    [data-testid="stMetric"] [data-testid="stMetricValue"] {
+        color: #000000 !important;
+    }
+    [data-testid="stMetric"] [data-testid="stMetricLabel"] {
+        color: #4B5563 !important;
+    }
+
+    /* Streamlit text inputs */
+    [data-testid="stTextInput"] input,
+    [data-testid="stTextArea"] textarea,
+    .stTextInput input,
+    .stTextArea textarea {
+        background: #FFFFFF !important;
+        color: #000000 !important;
+        border: 1px solid #D0D0D0 !important;
+    }
+    [data-testid="stTextInput"] input::placeholder,
+    [data-testid="stTextArea"] textarea::placeholder,
+    .stTextInput input::placeholder,
+    .stTextArea textarea::placeholder {
+        color: #888888 !important;
+    }
+    [data-testid="stTextInput"] label,
+    [data-testid="stTextArea"] label,
+    .stTextInput label,
+    .stTextArea label {
+        color: #000000 !important;
+    }
+
+    /* Captions */
+    .stCaption, [data-testid="stCaptionContainer"],
+    [data-testid="stCaptionContainer"] * {
+        color: #555555 !important;
+    }
+
+    /* File uploader */
+    [data-testid="stFileUploader"],
+    [data-testid="stFileUploader"] * {
+        color: #000000 !important;
+    }
+    [data-testid="stFileUploader"] section {
+        background: #FFFFFF !important;
+        border: 2px dashed #D0D0D0 !important;
+    }
+    [data-testid="stFileUploader"] section:hover {
+        border-color: #999999 !important;
+    }
+    [data-testid="stFileUploaderDropzone"] {
+        background: #FAFAFA !important;
+    }
+    [data-testid="stFileUploaderDropzoneInstructions"] span,
+    [data-testid="stFileUploaderDropzoneInstructions"] div {
+        color: #333333 !important;
+    }
+
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        background: #F5F5F5 !important;
+        border-radius: 8px;
+        padding: 4px;
+        gap: 4px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        color: #333333 !important;
+        background: transparent !important;
+        border-radius: 6px;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        background: #E8E8E8 !important;
+    }
+    .stTabs [aria-selected="true"] {
+        background: #FFFFFF !important;
+        color: #000000 !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+    }
+    .stTabs [data-baseweb="tab-panel"] {
+        background: #FFFFFF !important;
+        padding: 16px 0 !important;
+    }
+    .stTabs [data-baseweb="tab-highlight"] {
+        display: none !important;
+    }
+    .stTabs [data-baseweb="tab-border"] {
+        display: none !important;
+    }
+
+    /* Buttons */
+    .stButton button {
+        background: #000000 !important;
+        color: #FFFFFF !important;
+        border: none !important;
+    }
+    .stButton button:hover {
+        background: #333333 !important;
+    }
+    .stButton button[kind="secondary"] {
+        background: #F5F5F5 !important;
+        color: #000000 !important;
+        border: 1px solid #D0D0D0 !important;
+    }
+    .stButton button[kind="secondary"]:hover {
+        background: #E8E8E8 !important;
+    }
+
+    /* Selectbox */
+    [data-testid="stSelectbox"] label,
+    .stSelectbox label {
+        color: #000000 !important;
+    }
+
+    /* Expander */
+    [data-testid="stExpander"] {
+        background: #FFFFFF !important;
+        border: 1px solid #E0E0E0 !important;
+    }
+    [data-testid="stExpander"] summary {
+        color: #000000 !important;
+    }
+
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        background: #FFFFFF !important;
+    }
+    .stTabs [data-baseweb="tab"] {
+        color: #000000 !important;
+    }
+
+    /* All remaining divs with inline dark styles */
+    div[style*="background: #000"],
+    div[style*="background:#000"],
+    div[style*="background-color: #000"],
+    div[style*="background-color:#000"] {
+        background: #FFFFFF !important;
+        background-color: #FFFFFF !important;
+    }
+
+    ''' if theme['bg'] == '#FFFFFF' else ''}
+
+    /* ========== MAIN CONTENT ========== */
+    .proof-main {{
+        margin-top: 64px;
+        padding: 32px 48px;
+        max-width: 1200px;
+        margin-left: auto;
+        margin-right: auto;
+    }}
+
+    /* ========== TYPOGRAPHY ========== */
+    h1 {{
+        font-size: 32px !important;
+        font-weight: 700 !important;
+        color: {theme['text']} !important;
+        margin-bottom: 8px !important;
+    }}
+    h2 {{
+        font-size: 24px !important;
+        font-weight: 600 !important;
+        color: {theme['text']} !important;
+    }}
+    h3 {{
+        font-size: 18px !important;
+        font-weight: 600 !important;
+        color: {theme['text']} !important;
+    }}
+    p, span, label, div {{
+        color: {theme['text_secondary']} !important;
+    }}
+    .proof-subtitle {{
+        font-size: 16px;
+        color: {theme['text_secondary']};
+        margin-bottom: 32px;
+    }}
+
+    /* ========== CARDS ========== */
+    .proof-card {{
+        background: {theme['card']};
+        border: 1px solid {theme['border']};
+        border-radius: 12px;
+        padding: 24px;
+        transition: all 0.15s ease;
+    }}
+    .proof-card:hover {{
+        border-color: {theme['border_strong']};
+    }}
+    .proof-card-title {{
+        font-size: 16px;
+        font-weight: 600;
+        color: {theme['text']};
+        margin-bottom: 8px;
+    }}
+    .proof-card-desc {{
+        font-size: 14px;
+        color: {theme['text_secondary']};
+    }}
+
+    /* ========== BUTTONS ========== */
+    .stButton > button {{
+        border-radius: 8px !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        padding: 12px 24px !important;
+        min-height: 44px !important;
+        transition: all 0.15s ease !important;
+    }}
+    .stButton > button[kind="primary"] {{
+        background: {theme['text']} !important;
+        color: {theme['bg']} !important;
+        border: 1px solid {theme['text']} !important;
+    }}
+    .stButton > button[kind="primary"]:hover {{
+        background: {theme['text_secondary']} !important;
+        border-color: {theme['text_secondary']} !important;
+    }}
+    .stButton > button[kind="primary"] p,
+    .stButton > button[kind="primary"] span {{
+        color: {theme['bg']} !important;
+    }}
+    .stButton > button[kind="secondary"] {{
+        background: {theme['card']} !important;
+        color: {theme['text']} !important;
+        border: 1px solid {theme['border']} !important;
+    }}
+    .stButton > button[kind="secondary"] p,
+    .stButton > button[kind="secondary"] span,
+    .stButton > button[kind="secondary"] div {{
+        color: {theme['text']} !important;
+    }}
+    .stButton > button[kind="secondary"]:hover {{
+        background: {theme['card_hover']} !important;
+        border-color: {theme['border_strong']} !important;
+    }}
+
+    /* ========== INPUTS ========== */
+    .stTextInput input {{
+        background: {theme['card']} !important;
+        border: 1px solid {theme['border']} !important;
+        border-radius: 8px !important;
+        color: {theme['text']} !important;
+        padding: 12px 16px !important;
+        font-size: 14px !important;
+    }}
+    .stTextInput input:focus {{
+        border-color: {theme['text']} !important;
+        box-shadow: none !important;
+    }}
+    .stTextInput input::placeholder {{
+        color: {theme['text_muted']} !important;
+    }}
+
+    /* ========== FILE UPLOADER ========== */
+    [data-testid="stFileUploader"] > div {{
+        background: {theme['card']} !important;
+        border: 2px dashed {theme['border']} !important;
+        border-radius: 12px !important;
+        padding: 32px !important;
+    }}
+    [data-testid="stFileUploader"] > div:hover {{
+        border-color: {theme['text']} !important;
+    }}
+    [data-testid="stFileUploader"] button {{
+        background: {theme['text']} !important;
+        color: {theme['bg']} !important;
+        border: none !important;
+        border-radius: 6px !important;
+        font-weight: 600 !important;
+    }}
+    [data-testid="stFileUploader"] small {{
+        color: {theme['text_muted']} !important;
+    }}
+
+    /* ========== SELECTBOX ========== */
+    .stSelectbox > div > div {{
+        background: {theme['card']} !important;
+        border: 1px solid {theme['border']} !important;
+        border-radius: 8px !important;
+    }}
+    .stSelectbox > div > div > div {{
+        color: {theme['text']} !important;
+    }}
+
+    /* ========== ALERTS ========== */
+    .stSuccess {{
+        background: rgba(6, 193, 103, 0.1) !important;
+        border: 1px solid rgba(6, 193, 103, 0.3) !important;
+        border-radius: 8px !important;
+    }}
+    .stError {{
+        background: rgba(225, 25, 0, 0.1) !important;
+        border: 1px solid rgba(225, 25, 0, 0.3) !important;
+        border-radius: 8px !important;
+    }}
+    .stWarning {{
+        background: rgba(255, 149, 0, 0.1) !important;
+        border: 1px solid rgba(255, 149, 0, 0.3) !important;
+        border-radius: 8px !important;
+    }}
+    .stInfo {{
+        background: rgba(0, 0, 0, 0.05) !important;
+        border: 1px solid {theme['border']} !important;
+        border-radius: 8px !important;
+    }}
+
+    /* ========== PROGRESS ========== */
+    .stProgress > div > div {{
+        background: {theme['border']} !important;
+        border-radius: 4px !important;
+    }}
+    .stProgress > div > div > div {{
+        background: {theme['success']} !important;
+        border-radius: 4px !important;
+    }}
+
+    /* ========== EXPANDER ========== */
+    .stExpander {{
+        background: {theme['card']} !important;
+        border: 1px solid {theme['border']} !important;
+        border-radius: 8px !important;
+    }}
+
+    /* ========== DROPDOWN MENU ========== */
+    .proof-dropdown {{
+        position: relative;
+        display: inline-block;
+    }}
+    .proof-dropdown-content {{
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        background: {theme['card']};
+        border: 1px solid {theme['border']};
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        min-width: 160px;
+        z-index: 1001;
+        padding: 8px;
+    }}
+    .proof-dropdown:hover .proof-dropdown-content {{
+        display: block;
+    }}
+    .proof-dropdown-item {{
+        display: block;
+        padding: 10px 16px;
+        color: {theme['text']};
+        text-decoration: none;
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+    }}
+    .proof-dropdown-item:hover {{
+        background: {theme['bg_secondary']};
+    }}
+
+    /* ========== PAGE TABS ========== */
+    .proof-page-tabs {{
+        display: flex;
+        gap: 4px;
+        padding: 4px;
+        background: {theme['bg_secondary']};
+        border-radius: 10px;
+        width: fit-content;
+    }}
+    .proof-tab {{
+        padding: 10px 24px;
+        font-size: 14px;
+        font-weight: 500;
+        color: {theme['text_secondary']};
+        background: transparent;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }}
+    .proof-tab:hover {{
+        color: {theme['text']};
+    }}
+    .proof-tab.active {{
+        background: {theme['card']};
+        color: {theme['text']};
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }}
+
+    /* ========== ISSUE CARDS ========== */
+    .proof-issue-card {{
+        background: {theme['card']};
+        border: 1px solid {theme['border']};
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 8px;
+    }}
+    .proof-issue-pass {{
+        border-left: 3px solid {theme['success']};
+    }}
+    .proof-issue-warning {{
+        border-left: 3px solid {theme['warning']};
+    }}
+    .proof-issue-fail {{
+        border-left: 3px solid {theme['error']};
+    }}
+
+    /* ========== SCORE BADGE ========== */
+    .proof-score {{
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 16px;
+        border-radius: 100px;
+        font-size: 14px;
+        font-weight: 700;
+    }}
+    .proof-score.pass {{
+        background: rgba(6, 193, 103, 0.15);
+        color: {theme['success']};
+    }}
+    .proof-score.review {{
+        background: rgba(255, 149, 0, 0.15);
+        color: {theme['warning']};
+    }}
+    .proof-score.fail {{
+        background: rgba(225, 25, 0, 0.15);
+        color: {theme['error']};
+    }}
+    </style>
+    """
+
+
 def main():
     st.set_page_config(
-        page_title="Proof by Aerial Canvas",
+        page_title="Proof - QA Tool",
         page_icon="✓",
-        layout="wide"
+        layout="wide",
+        initial_sidebar_state="collapsed"
     )
 
     # =============================================
@@ -12115,25 +12925,188 @@ def main():
         if user:
             st.session_state.current_user_id = user['id']
 
-    # Clean, Simple Design
+    # =============================================
+    # THEME & DARK MODE INITIALIZATION
+    # =============================================
+    if 'dark_mode' not in st.session_state:
+        st.session_state.dark_mode = False  # Start with light mode (Uber-style)
+
+    if 'app_page' not in st.session_state:
+        st.session_state.app_page = "Photo Proof"
+
+    # =============================================
+    # HANDLE URL NAVIGATION (BEFORE getting theme colors)
+    # =============================================
+    query_params = st.query_params
+
+    # Handle theme switch
+    theme_param = query_params.get("theme")
+    if theme_param:
+        if theme_param == "dark":
+            st.session_state.dark_mode = True
+        elif theme_param == "light":
+            st.session_state.dark_mode = False
+        st.query_params.clear()
+        st.rerun()
+
+    # Handle page navigation
+    page_param = query_params.get("page")
+    if page_param:
+        page_map = {
+            "video": ("Video Proof", "Video"),
+            "photo": ("Photo Proof", "Photo"),
+            "photo_sort": ("Photo Sort", "Auto Sort"),
+            "video_sort": ("Video Sort", "Auto Sort"),
+            "about": ("About", "About"),
+        }
+        if page_param in page_map:
+            new_page, new_mode = page_map[page_param]
+            st.session_state.app_page = new_page
+            st.session_state.app_mode = new_mode
+            st.query_params.clear()
+            st.rerun()
+
+    # Get current theme colors (AFTER URL params are processed)
+    theme = get_theme_colors()
+
+    # Apply new Proof Design System CSS
+    st.markdown(get_proof_css(theme), unsafe_allow_html=True)
+
+    # =============================================
+    # NAVBAR WITH LOGO
+    # =============================================
+    import base64
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    proof_logo_path = os.path.join(script_dir, "Proof.png")
+
+    logo_b64 = None
+    if os.path.exists(proof_logo_path):
+        with open(proof_logo_path, "rb") as f:
+            logo_b64 = base64.b64encode(f.read()).decode()
+
+    # =============================================
+    # CLICKABLE NAVBAR - ALL IN ONE BAR
+    # =============================================
+    is_dark = st.session_state.dark_mode
+    current_page = st.session_state.app_page
+
+    # Active states
+    video_active = "active" if current_page == "Video Proof" else ""
+    photo_active = "active" if current_page == "Photo Proof" else ""
+    sort_active = "active" if current_page in ["Photo Sort", "Video Sort"] else ""
+    about_active = "active" if current_page == "About" else ""
+
+    # Logo (inverts based on theme)
+    logo_img = f'<img src="data:image/png;base64,{logo_b64}" style="height: 54px; filter: {"invert(1)" if not is_dark else "none"};">' if logo_b64 else f'<span style="font-weight: 700; font-size: 28px; color: {theme["text"]};">Proof</span>'
+
+    # Toggle knob position
+    knob_left = "24px" if is_dark else "2px"
+
+    # Additional CSS for clickable navbar and footer
+    st.markdown(f"""
+    <style>
+    /* Sticky footer */
+    .proof-footer {{
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: {theme['navbar']};
+        border-top: 1px solid {theme['border']};
+        padding: 16px 32px;
+        z-index: 999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 48px;
+    }}
+    .proof-footer-stat {{
+        text-align: center;
+    }}
+    .proof-footer-stat-value {{
+        font-size: 20px;
+        font-weight: 700;
+        color: {theme['text']};
+    }}
+    .proof-footer-stat-label {{
+        font-size: 10px;
+        color: {theme['text_secondary']};
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }}
+    .proof-footer-brand {{
+        font-size: 11px;
+        color: {theme['text_muted']};
+        letter-spacing: 0.5px;
+    }}
+    /* Add padding to bottom of page for footer */
+    .main .block-container {{
+        padding-bottom: 100px !important;
+    }}
+    /* Clickable toggle */
+    .proof-toggle {{
+        cursor: pointer;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Navbar with HTML toggle
+    st.markdown(f"""
+    <div class="proof-navbar">
+        <div class="proof-navbar-logo">
+            {logo_img}
+        </div>
+        <div class="proof-navbar-nav">
+            <a href="?page=photo" target="_self" class="proof-navbar-link {photo_active}">Photo</a>
+            <a href="?page=video" target="_self" class="proof-navbar-link {video_active}">Video</a>
+            <div class="proof-dropdown">
+                <span class="proof-navbar-link {sort_active}">Auto Sort ▾</span>
+                <div class="proof-dropdown-content">
+                    <a href="?page=photo_sort" target="_self" class="proof-dropdown-item">Photo</a>
+                    <a href="?page=video_sort" target="_self" class="proof-dropdown-item">Video</a>
+                </div>
+            </div>
+            <a href="?page=about" target="_self" class="proof-navbar-link {about_active}">About</a>
+        </div>
+        <div class="proof-navbar-right">
+            <span style="color: {theme['text_muted']}; font-size: 11px; font-weight: 600; letter-spacing: 1px;">BETA</span>
+            <a href="?theme={'light' if is_dark else 'dark'}" target="_self" style="text-decoration: none; display: block;">
+                <div class="proof-toggle" style="background: {theme['bg_secondary']}; border: 1px solid {theme['border']}; width: 48px; height: 26px; border-radius: 13px; position: relative; cursor: pointer;">
+                    <div id="theme-toggle-knob" style="position: absolute; top: 2px; left: {knob_left}; width: 20px; height: 20px; border-radius: 50%; transition: left 0.3s ease;"></div>
+                </div>
+            </a>
+        </div>
+    </div>
+    <style>
+        #theme-toggle-knob {{
+            background: {'#FFFFFF' if is_dark else '#000000'} !important;
+        }}
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Spacer for fixed navbar
+    st.markdown("<div style='height: 80px;'></div>", unsafe_allow_html=True)
+
+    # =============================================
+    # MAIN CONTENT AREA
+    # =============================================
+    # Map new page names to old app_mode for compatibility
+    page_to_mode = {
+        "Photo Proof": "Photo",
+        "Video Proof": "Video",
+        "Photo Sort": "Auto Sort",
+        "Video Sort": "Auto Sort",
+        "About": "About"
+    }
+
+    if 'app_mode' not in st.session_state:
+        st.session_state.app_mode = page_to_mode.get(current_page, "Photo")
+
+    # Legacy CSS (keeping for compatibility during transition)
     st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
-    /* Force single black background everywhere */
-    .stApp, .main, .block-container,
-    [data-testid="stAppViewContainer"],
-    [data-testid="stHeader"],
-    [data-testid="stToolbar"],
-    .stApp > header,
-    .stApp > div,
-    section[data-testid="stSidebar"],
-    div[data-testid="stDecoration"] {
-        background: #000 !important;
-        background-color: #000 !important;
-    }
-
-    * { font-family: 'Poppins', -apple-system, sans-serif !important; }
     #MainMenu, footer, header { visibility: hidden; }
 
     .block-container {
@@ -12150,7 +13123,7 @@ def main():
         text-align: center;
         padding: 20px 20px 15px;
     }
-    .hero-title { font-size: 40px; color: #7B8CDE !important; }
+    .hero-title { font-size: 40px; color: #000000 !important; }
     .hero-subtitle { color: #71717a !important; }
     .tagline {
         font-size: 15px;
@@ -12197,7 +13170,7 @@ def main():
     }
     .feature-tag::before {
         content: "✓";
-        color: #7B8CDE;
+        color: #000000;
         font-size: 11px;
     }
 
@@ -12225,7 +13198,7 @@ def main():
         background: rgba(255,255,255,0.06) !important;
     }
     .stTabs [aria-selected="true"] {
-        background: #7B8CDE !important;
+        background: #000000 !important;
         color: #000000 !important;
     }
     .stTabs [aria-selected="true"] p,
@@ -12242,17 +13215,17 @@ def main():
         padding: 20px !important;
     }
     [data-testid="stFileUploader"] > div:hover {
-        border-color: #7B8CDE !important;
+        border-color: #000000 !important;
     }
     [data-testid="stFileUploader"] button {
-        background: #7B8CDE !important;
+        background: #000000 !important;
         color: #000 !important;
         border: none !important;
         border-radius: 6px !important;
         font-weight: 600 !important;
     }
     [data-testid="stFileUploader"] button:hover {
-        background: #9BA8E8 !important;
+        background: #333333 !important;
     }
     [data-testid="stFileUploader"] small { color: #71717a !important; }
 
@@ -12265,7 +13238,7 @@ def main():
         padding: 10px 14px !important;
     }
     .stTextInput input:focus {
-        border-color: #7B8CDE !important;
+        border-color: #000000 !important;
         box-shadow: none !important;
     }
     .stTextInput input::placeholder { color: #71717a !important; }
@@ -12280,46 +13253,26 @@ def main():
         transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease !important;
     }
 
-    /* Buttons - Primary (selected) */
-    .stButton > button[kind="primary"] {
-        background: #7B8CDE !important;
-        color: #000000 !important;
-        border: 1px solid #7B8CDE !important;
-    }
+    /* Buttons - Primary (selected) - base styles, colors handled by theme-specific CSS */
     .stButton > button[kind="primary"]:hover {
-        background: #9BA8E8 !important;
-        border-color: #9BA8E8 !important;
-    }
-    .stButton > button[kind="primary"] p,
-    .stButton > button[kind="primary"] span,
-    .stButton > button[kind="primary"] div {
-        color: #000000 !important;
+        opacity: 0.9;
     }
 
-    /* Buttons - Secondary (unselected) */
+    /* Buttons - Secondary (unselected) - base styles only, colors handled by theme-specific CSS */
     .stButton > button[kind="secondary"] {
-        background: #1a1a1a !important;
-        color: #ffffff !important;
         border: 1px solid #333333 !important;
     }
     .stButton > button[kind="secondary"]:hover {
-        background: #252525 !important;
         border-color: #555 !important;
-        color: #ffffff !important;
-    }
-    .stButton > button[kind="secondary"] p,
-    .stButton > button[kind="secondary"] span,
-    .stButton > button[kind="secondary"] div {
-        color: #ffffff !important;
     }
 
     /* Form submit button - brand purple, not red */
     .stFormSubmitButton > button,
     [data-testid="stFormSubmitButton"] > button,
     button[kind="primaryFormSubmit"] {
-        background: #7B8CDE !important;
+        background: #000000 !important;
         color: #000000 !important;
-        border: 1px solid #7B8CDE !important;
+        border: 1px solid #000000 !important;
         border-radius: 8px !important;
         font-weight: 700 !important;
         padding: 10px 20px !important;
@@ -12327,8 +13280,8 @@ def main():
     .stFormSubmitButton > button:hover,
     [data-testid="stFormSubmitButton"] > button:hover,
     button[kind="primaryFormSubmit"]:hover {
-        background: #9BA8E8 !important;
-        border-color: #9BA8E8 !important;
+        background: #333333 !important;
+        border-color: #333333 !important;
     }
     .stFormSubmitButton > button p,
     .stFormSubmitButton > button span,
@@ -12354,7 +13307,7 @@ def main():
 
     /* Progress */
     .stProgress > div > div { background: #1d1d1f !important; }
-    .stProgress > div > div > div { background: #7B8CDE !important; }
+    .stProgress > div > div > div { background: #000000 !important; }
 
     /* Range Slider - Clean style (no negative margins) */
     .stSlider {
@@ -12367,13 +13320,13 @@ def main():
         border-radius: 4px !important;
     }
     .stSlider > div > div > div > div {
-        background: #7B8CDE !important;
+        background: #000000 !important;
         border-radius: 4px !important;
     }
     .stSlider [data-testid="stThumbValue"] {
         color: #fff !important;
         background: #161616 !important;
-        border: 1px solid #7B8CDE !important;
+        border: 1px solid #000000 !important;
         border-radius: 4px !important;
         padding: 2px 6px !important;
         font-size: 11px !important;
@@ -12381,13 +13334,13 @@ def main():
     /* Slider thumbs - brand purple style */
     .stSlider > div > div > div > div > div {
         background: #fff !important;
-        border: 2px solid #7B8CDE !important;
+        border: 2px solid #000000 !important;
         box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important;
         width: 16px !important;
         height: 16px !important;
     }
     .stSlider > div > div > div > div > div:hover {
-        background: #7B8CDE !important;
+        background: #000000 !important;
         transform: scale(1.1);
     }
 
@@ -12450,16 +13403,16 @@ def main():
     /* Hover state */
     div[data-testid="stRadio"] label:hover {
         color: #fff !important;
-        border-color: #7B8CDE !important;
+        border-color: #000000 !important;
     }
 
     /* Selected state - PURPLE background with black text */
     div[data-testid="stRadio"] label[data-checked="true"],
     div[data-testid="stRadio"] label:has(input:checked) {
-        background: #7B8CDE !important;
+        background: #000000 !important;
         color: #000 !important;
         font-weight: 600 !important;
-        border-color: #7B8CDE !important;
+        border-color: #000000 !important;
     }
 
     /* Hide the actual radio circle */
@@ -12545,7 +13498,7 @@ def main():
     .photo-thumbnail:hover {
         transform: scale(1.02);
         box-shadow: 0 4px 16px rgba(123, 140, 222, 0.3);
-        border-color: #7B8CDE;
+        border-color: #000000;
     }
 
     /* On-brand icon badges (replacing emojis) */
@@ -12559,7 +13512,7 @@ def main():
         border-radius: 4px;
         font-size: 11px;
         font-weight: 600;
-        color: #7B8CDE;
+        color: #000000;
         margin-right: 6px;
     }
     .icon-badge.success {
@@ -12579,113 +13532,125 @@ def main():
     """, unsafe_allow_html=True)
 
     # =============================================
-    # HEADER WITH LOGO
+    # PAGE CONTENT - Controlled by new navbar above
     # =============================================
-    import base64
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    proof_logo_path = os.path.join(script_dir, "Proof.png")
-
-    # Load and display logo - BIGGER
-    if os.path.exists(proof_logo_path):
-        with open(proof_logo_path, "rb") as f:
-            proof_logo_b64 = base64.b64encode(f.read()).decode()
-        logo_html = f'<img src="data:image/png;base64,{proof_logo_b64}" style="max-width: 700px; width: 100%;">'
-    else:
-        logo_html = '<h1 style="color: #7B8CDE; font-size: 56px; font-weight: 600;">Proof</h1>'
-
-    st.markdown(f"""
-    <div style="text-align: center; padding: 30px 20px 20px;">
-        {logo_html}
-    </div>
-    """, unsafe_allow_html=True)
-
-    # =============================================
-    # CUSTOM TAB BUTTONS - Photo | Video | Auto Sort
-    # =============================================
-    if 'app_mode' not in st.session_state:
-        st.session_state.app_mode = "Photo"
-
-    # CSS for custom tab buttons
-    st.markdown("""
-    <style>
-    /* Container for tab buttons */
-    .tab-container {
-        display: flex;
-        justify-content: center;
-        margin-bottom: 30px;
-    }
-    .tab-container > div {
-        display: flex;
-        justify-content: center;
-    }
-    .tab-container [data-testid="stHorizontalBlock"] {
-        gap: 12px;
-        padding: 8px;
-        border: 1px solid #1d1d1f;
-        border-radius: 12px;
-        width: fit-content;
-        justify-content: center;
-    }
-    /* Style ALL tab buttons - default state (not selected) */
-    .tab-container button[kind="secondary"] {
-        padding: 12px 32px !important;
-        border: 1px solid #1d1d1f !important;
-        border-radius: 8px !important;
-        color: #71717a !important;
-        font-size: 15px !important;
-        font-weight: 500 !important;
-        background: transparent !important;
-        min-width: 100px;
-    }
-    .tab-container button[kind="secondary"]:hover {
-        color: #fff !important;
-        border-color: #7B8CDE !important;
-        background: transparent !important;
-    }
-    /* Selected tab - purple background with black text */
-    .tab-container button[kind="primary"] {
-        padding: 12px 32px !important;
-        border: 1px solid #7B8CDE !important;
-        border-radius: 8px !important;
-        background: #7B8CDE !important;
-        color: #000 !important;
-        font-size: 15px !important;
-        font-weight: 600 !important;
-        min-width: 100px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    # Centered tab buttons using columns
-    st.markdown('<div class="tab-container">', unsafe_allow_html=True)
-
-    # Calculate center columns
-    spacer1, btn_col, spacer2 = st.columns([1, 2, 1])
-
-    with btn_col:
-        tab_cols = st.columns(3)
-        with tab_cols[0]:
-            if st.button("Photo Proof", key="btn_photo", type="primary" if st.session_state.app_mode == "Photo" else "secondary", use_container_width=True):
-                st.session_state.app_mode = "Photo"
-                st.rerun()
-        with tab_cols[1]:
-            if st.button("Video Proof", key="btn_video", type="primary" if st.session_state.app_mode == "Video" else "secondary", use_container_width=True):
-                st.session_state.app_mode = "Video"
-                st.rerun()
-        with tab_cols[2]:
-            if st.button("Auto Sort", key="btn_autosort", type="primary" if st.session_state.app_mode == "Auto Sort" else "secondary", use_container_width=True):
-                st.session_state.app_mode = "Auto Sort"
-                st.rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)
 
     app_mode = st.session_state.app_mode
+    current_page = st.session_state.app_page
+
+    # =============================================
+    # ABOUT PAGE - Professional SaaS Design
+    # =============================================
+    if app_mode == "About":
+        # Get the logo for the About page
+        import base64
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        proof_logo_path = os.path.join(script_dir, "Proof.png")
+
+        # Use Streamlit native components for reliable theming
+        st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+
+        # Center the logo with proper inversion for light mode
+        is_light = theme['bg'] == '#FFFFFF'
+        logo_filter = "invert(1)" if is_light else "none"
+
+        if os.path.exists(proof_logo_path):
+            import base64
+            with open(proof_logo_path, "rb") as f:
+                logo_b64 = base64.b64encode(f.read()).decode()
+            st.markdown(f"""
+            <div style="text-align: center; margin-bottom: 8px;">
+                <img src="data:image/png;base64,{logo_b64}" style="height: 142px; filter: {logo_filter};">
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"<h1 style='text-align: center; color: {theme['text']};'>Proof</h1>", unsafe_allow_html=True)
+
+        st.markdown(f"""
+        <p style="text-align: center; color: {theme['text_secondary']}; font-size: 18px; margin-top: 8px; margin-bottom: 40px;">
+            Quality Assurance Built for Real Estate Content
+        </p>
+        """, unsafe_allow_html=True)
+
+        # Card styling for the current theme
+        card_bg = theme['card']
+        card_border = theme['border']
+        text_primary = theme['text']
+        text_secondary = theme['text_secondary']
+        text_muted = theme['text_muted']
+
+        # Why Proof Exists card
+        st.markdown(f"""
+        <div style="background: {card_bg}; border: 1px solid {card_border}; border-radius: 16px; padding: 32px; margin-bottom: 20px; max-width: 800px; margin-left: auto; margin-right: auto;">
+            <h2 style="color: {text_primary}; font-size: 20px; font-weight: 600; margin: 0 0 16px 0;">Why Proof Exists</h2>
+            <p style="color: {text_secondary}; font-size: 15px; line-height: 1.7; margin: 0 0 16px 0;">
+                Proof was created out of necessity. As a production team handling hundreds of real estate shoots,
+                we needed a way to maintain consistency in our content delivery while improving speed and efficiency
+                in editing and sorting. Every minute saved means a better experience for our clients.
+            </p>
+            <p style="color: {text_secondary}; font-size: 15px; line-height: 1.7; margin: 0;">
+                Before Proof, quality checks were manual and time-consuming. Files were sorted by hand.
+                Mistakes happened. Now, with automated QA and intelligent sorting, we can deliver faster
+                without sacrificing quality.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # What Proof Does card
+        st.markdown(f"""
+        <div style="background: {card_bg}; border: 1px solid {card_border}; border-radius: 16px; padding: 32px; margin-bottom: 20px; max-width: 800px; margin-left: auto; margin-right: auto;">
+            <h2 style="color: {text_primary}; font-size: 20px; font-weight: 600; margin: 0 0 20px 0;">What Proof Does</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                <div>
+                    <h3 style="color: {text_primary}; font-size: 16px; font-weight: 600; margin: 0 0 8px 0;">Photo & Video QA</h3>
+                    <p style="color: {text_secondary}; font-size: 14px; line-height: 1.6; margin: 0;">
+                        Automated quality checks for both photos and videos. Catch technical issues,
+                        verify specifications, and ensure every deliverable meets your standards.
+                    </p>
+                </div>
+                <div>
+                    <h3 style="color: {text_primary}; font-size: 16px; font-weight: 600; margin: 0 0 8px 0;">Auto Sort</h3>
+                    <p style="color: {text_secondary}; font-size: 14px; line-height: 1.6; margin: 0;">
+                        AI-powered room detection automatically sorts and renames your photos by room type.
+                        Albums are ready for delivery in the standard order clients expect.
+                    </p>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Built for Real Estate card
+        st.markdown(f"""
+        <div style="background: {card_bg}; border: 1px solid {card_border}; border-radius: 16px; padding: 32px; margin-bottom: 20px; max-width: 800px; margin-left: auto; margin-right: auto;">
+            <h2 style="color: {text_primary}; font-size: 20px; font-weight: 600; margin: 0 0 16px 0;">Built for Real Estate</h2>
+            <p style="color: {text_secondary}; font-size: 15px; line-height: 1.7; margin: 0;">
+                Proof is designed specifically for real estate photography and videography workflows.
+                Every feature—from room detection categories to delivery order standards—is tailored to
+                the unique needs of real estate content production.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Footer tagline
+        accent_bg = 'rgba(123, 140, 222, 0.08)' if theme['bg'] == '#FFFFFF' else 'rgba(123, 140, 222, 0.15)'
+        st.markdown(f"""
+        <div style="background: {accent_bg}; border: 1px solid rgba(123, 140, 222, 0.15); border-radius: 12px; padding: 24px; text-align: center; max-width: 800px; margin-left: auto; margin-right: auto;">
+            <p style="color: {text_primary}; font-size: 16px; font-weight: 600; margin: 0 0 4px 0;">Proof by Aerial Canvas</p>
+            <p style="color: {text_muted}; font-size: 12px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; margin: 0;">Consistency · Speed · Quality</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Footer with stats
+        render_footer()
+        return
 
     # =============================================
     # AUTO SORT - Footage Organization & XML Export
     # =============================================
     if app_mode == "Auto Sort":
-        display_auto_sort()
+        # Determine if this is Photo Sort or Video Sort based on page
+        sort_type = "Photos" if current_page == "Photo Sort" else "Video"
+        display_auto_sort(sort_type=sort_type)
         return
 
     # =============================================
@@ -12696,49 +13661,85 @@ def main():
         <div style="text-align: center; margin-bottom: 30px;">
             <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 8px;">
                 {icon('video_icon', 28)}
-                <h2 style="color: #fff; margin: 0;">Video Proof</h2>
+                <h2 style="color: {theme['text']}; margin: 0;">Video Proof</h2>
             </div>
-            <p style="color: #a1a1aa; font-size: 14px;">Complete QA analysis for video deliverables - 20 automated checks</p>
+            <p style="color: {theme['text_secondary']}; font-size: 14px;">Complete QA analysis for video deliverables - 20 automated checks</p>
         </div>
         """, unsafe_allow_html=True)
 
-        # Feature overview cards
+        # Feature overview cards - theme aware
         st.markdown(f"""
         <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 30px;">
-            <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 16px; text-align: center;">
+            <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 16px; text-align: center;">
                 <div style="margin-bottom: 8px;">{icon('technical_scan', 24)}</div>
-                <div style="color: #fff; font-weight: 600; font-size: 13px; margin-bottom: 4px;">Technical</div>
-                <div style="color: #71717a; font-size: 11px;">Format, resolution, framerate</div>
+                <div style="color: {theme['text']}; font-weight: 600; font-size: 13px; margin-bottom: 4px;">Technical</div>
+                <div style="color: {theme['text_secondary']}; font-size: 11px;">Format, resolution, framerate</div>
             </div>
-            <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 16px; text-align: center;">
+            <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 16px; text-align: center;">
                 <div style="margin-bottom: 8px;">{icon('audio_analysis', 24)}</div>
-                <div style="color: #fff; font-weight: 600; font-size: 13px; margin-bottom: 4px;">Audio</div>
-                <div style="color: #71717a; font-size: 11px;">Levels, fades, noise, music</div>
+                <div style="color: {theme['text']}; font-weight: 600; font-size: 13px; margin-bottom: 4px;">Audio</div>
+                <div style="color: {theme['text_secondary']}; font-size: 11px;">Levels, fades, noise, music</div>
             </div>
-            <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 16px; text-align: center;">
+            <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 16px; text-align: center;">
                 <div style="margin-bottom: 8px;">{icon('color_grade', 24)}</div>
-                <div style="color: #fff; font-weight: 600; font-size: 13px; margin-bottom: 4px;">Color</div>
-                <div style="color: #71717a; font-size: 11px;">Grading, consistency, log</div>
+                <div style="color: {theme['text']}; font-weight: 600; font-size: 13px; margin-bottom: 4px;">Color</div>
+                <div style="color: {theme['text_secondary']}; font-size: 11px;">Grading, consistency, log</div>
             </div>
-            <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 16px; text-align: center;">
+            <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 16px; text-align: center;">
                 <div style="margin-bottom: 8px;">{icon('edit_quality', 24)}</div>
-                <div style="color: #fff; font-weight: 600; font-size: 13px; margin-bottom: 4px;">Edit</div>
-                <div style="color: #71717a; font-size: 11px;">Transitions, lower thirds</div>
+                <div style="color: {theme['text']}; font-weight: 600; font-size: 13px; margin-bottom: 4px;">Edit</div>
+                <div style="color: {theme['text_secondary']}; font-size: 11px;">Transitions, lower thirds</div>
             </div>
-            <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 16px; text-align: center;">
+            <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 16px; text-align: center;">
                 <div style="margin-bottom: 8px;">{icon('compliance', 24)}</div>
-                <div style="color: #fff; font-weight: 600; font-size: 13px; margin-bottom: 4px;">Compliance</div>
-                <div style="color: #71717a; font-size: 11px;">Naming, deliverables</div>
+                <div style="color: {theme['text']}; font-weight: 600; font-size: 13px; margin-bottom: 4px;">Compliance</div>
+                <div style="color: {theme['text_secondary']}; font-size: 11px;">Naming, deliverables</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-        # Analysis Mode Selection
-        st.markdown("""
+        # Analysis Mode Selection - theme aware
+        st.markdown(f"""
         <div style="margin-bottom: 16px;">
-            <div style="color: #fff; font-weight: 600; font-size: 14px; margin-bottom: 12px;">Analysis Mode</div>
+            <div style="color: {theme['text']}; font-weight: 600; font-size: 14px; margin-bottom: 12px;">Analysis Mode</div>
         </div>
         """, unsafe_allow_html=True)
+
+        # Force light mode button styles for mode selection
+        if theme['bg'] == '#FFFFFF':
+            st.markdown("""
+            <style>
+            /* Light mode for Quick Scan / Standard / Full Analysis buttons */
+            /* All buttons - clean light style with no heavy borders */
+            [data-testid="stHorizontalBlock"] .stButton > button {
+                background-color: #F5F5F5 !important;
+                color: #000000 !important;
+                border: none !important;
+                border-radius: 8px !important;
+            }
+            [data-testid="stHorizontalBlock"] .stButton > button p,
+            [data-testid="stHorizontalBlock"] .stButton > button span,
+            [data-testid="stHorizontalBlock"] .stButton > button div {
+                color: #000000 !important;
+                border: none !important;
+            }
+            [data-testid="stHorizontalBlock"] .stButton > button:hover {
+                background-color: #E8E8E8 !important;
+            }
+            /* Selected button - slightly darker background */
+            [data-testid="stHorizontalBlock"] .stButton > button[kind="primary"] {
+                background-color: #E0E0E0 !important;
+                color: #000000 !important;
+                border: none !important;
+                font-weight: 600 !important;
+            }
+            [data-testid="stHorizontalBlock"] .stButton > button[kind="primary"] p,
+            [data-testid="stHorizontalBlock"] .stButton > button[kind="primary"] span,
+            [data-testid="stHorizontalBlock"] .stButton > button[kind="primary"] div {
+                color: #000000 !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
 
         # Mode selection cards
         mode_col1, mode_col2, mode_col3 = st.columns(3)
@@ -12757,8 +13758,8 @@ def main():
             ):
                 st.session_state.video_analysis_mode = 'quick'
                 st.rerun()
-            st.markdown("""
-            <div style="text-align: center; color: #71717a; font-size: 11px; margin-top: 4px;">
+            st.markdown(f"""
+            <div style="text-align: center; color: {theme['text_secondary']}; font-size: 11px; margin-top: 4px;">
                 Fast • Basic checks
             </div>
             """, unsafe_allow_html=True)
@@ -12773,8 +13774,8 @@ def main():
             ):
                 st.session_state.video_analysis_mode = 'standard'
                 st.rerun()
-            st.markdown("""
-            <div style="text-align: center; color: #71717a; font-size: 11px; margin-top: 4px;">
+            st.markdown(f"""
+            <div style="text-align: center; color: {theme['text_secondary']}; font-size: 11px; margin-top: 4px;">
                 Balanced • Most checks
             </div>
             """, unsafe_allow_html=True)
@@ -12789,8 +13790,8 @@ def main():
             ):
                 st.session_state.video_analysis_mode = 'full'
                 st.rerun()
-            st.markdown("""
-            <div style="text-align: center; color: #71717a; font-size: 11px; margin-top: 4px;">
+            st.markdown(f"""
+            <div style="text-align: center; color: {theme['text_secondary']}; font-size: 11px; margin-top: 4px;">
                 Thorough • All checks
             </div>
             """, unsafe_allow_html=True)
@@ -12803,9 +13804,9 @@ def main():
         }
 
         st.markdown(f"""
-        <div style="background: rgba(123, 140, 222, 0.1); border: 1px solid rgba(123, 140, 222, 0.2);
+        <div style="background: {theme['bg_secondary']}; border: 1px solid {theme['border']};
                     border-radius: 8px; padding: 12px; margin: 16px 0 20px;">
-            <div style="color: #a1a1aa; font-size: 12px;">
+            <div style="color: {theme['text_secondary']}; font-size: 12px;">
                 {mode_descriptions.get(st.session_state.video_analysis_mode, '')}
             </div>
         </div>
@@ -12816,12 +13817,12 @@ def main():
 
         with info_col:
             st.markdown(f"""
-            <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 20px; min-height: 180px;">
+            <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 20px; min-height: 180px;">
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
                     {icon('info', 18)}
-                    <span style="color: #fff; font-weight: 600; font-size: 15px;">How it Works</span>
+                    <span style="color: {theme['text']}; font-weight: 600; font-size: 15px;">How it Works</span>
                 </div>
-                <ol style="color: #a1a1aa; font-size: 13px; margin: 0; padding-left: 20px; line-height: 1.9;">
+                <ol style="color: {theme['text_secondary']}; font-size: 13px; margin: 0; padding-left: 20px; line-height: 1.9;">
                     <li>Paste your Dropbox video link below</li>
                     <li>We analyze technical specs, audio, color, and 20+ checks</li>
                     <li>Frame-by-frame scanning detects issues</li>
@@ -12831,30 +13832,30 @@ def main():
             """, unsafe_allow_html=True)
 
         with score_col:
-            st.markdown("""
-            <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 20px; min-height: 180px;">
-                <div style="color: #fff; font-weight: 600; font-size: 15px; margin-bottom: 16px;">QA Score</div>
-                <div style="color: #71717a; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;">Score Tiers</div>
+            st.markdown(f"""
+            <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 20px; min-height: 180px;">
+                <div style="color: {theme['text']}; font-weight: 600; font-size: 15px; margin-bottom: 16px;">QA Score</div>
+                <div style="color: {theme['text_secondary']}; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;">Score Tiers</div>
                 <div style="display: flex; flex-direction: column; gap: 10px;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="width: 8px; height: 8px; background: #4ade80; border-radius: 50%; display: inline-block;"></span>
                         <span style="color: #4ade80; font-size: 13px; font-weight: 600; width: 52px;">90-100</span>
-                        <span style="color: #a1a1aa; font-size: 12px;">Pass</span>
+                        <span style="color: {theme['text_secondary']}; font-size: 12px;">Pass</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="width: 8px; height: 8px; background: #facc15; border-radius: 50%; display: inline-block;"></span>
                         <span style="color: #facc15; font-size: 13px; font-weight: 600; width: 52px;">70-89</span>
-                        <span style="color: #a1a1aa; font-size: 12px;">Review</span>
+                        <span style="color: {theme['text_secondary']}; font-size: 12px;">Review</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="width: 8px; height: 8px; background: #f59e0b; border-radius: 50%; display: inline-block;"></span>
                         <span style="color: #f59e0b; font-size: 13px; font-weight: 600; width: 52px;">50-69</span>
-                        <span style="color: #a1a1aa; font-size: 12px;">Attention</span>
+                        <span style="color: {theme['text_secondary']}; font-size: 12px;">Attention</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="width: 8px; height: 8px; background: #ef4444; border-radius: 50%; display: inline-block;"></span>
                         <span style="color: #ef4444; font-size: 13px; font-weight: 600; width: 52px;">0-49</span>
-                        <span style="color: #a1a1aa; font-size: 12px;">Fail</span>
+                        <span style="color: {theme['text_secondary']}; font-size: 12px;">Fail</span>
                     </div>
                 </div>
             </div>
@@ -12862,6 +13863,93 @@ def main():
 
         # Spacing after cards
         st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
+
+        # Force light mode styles for Video Proof tabs and inputs
+        if theme['bg'] == '#FFFFFF':
+            st.markdown("""
+            <style>
+            /* FORCE Light mode for tabs */
+            .stTabs [data-baseweb="tab-list"] {
+                background: #F0F0F0 !important;
+                border-radius: 10px !important;
+                padding: 6px !important;
+            }
+            .stTabs [data-baseweb="tab"] {
+                color: #333333 !important;
+                background: transparent !important;
+                font-weight: 500 !important;
+            }
+            .stTabs [aria-selected="true"] {
+                background: #FFFFFF !important;
+                color: #000000 !important;
+                font-weight: 600 !important;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+                border-radius: 8px !important;
+            }
+            /* FORCE Light mode for text inputs */
+            .stTextInput > div > div > input {
+                background-color: #FFFFFF !important;
+                color: #000000 !important;
+                border: 1px solid #CCCCCC !important;
+                border-radius: 8px !important;
+            }
+            .stTextInput > div > div > input::placeholder {
+                color: #888888 !important;
+            }
+            /* FORCE Light mode for file uploader */
+            .stFileUploader,
+            .stFileUploader > div,
+            .stFileUploader section,
+            .stFileUploader [data-testid="stFileUploaderDropzone"] {
+                background-color: #FAFAFA !important;
+                border: 2px dashed #CCCCCC !important;
+                border-radius: 10px !important;
+            }
+            .stFileUploader label,
+            .stFileUploader span,
+            .stFileUploader p,
+            .stFileUploader div,
+            .stFileUploader [data-testid="stFileUploaderDropzoneInstructions"],
+            .stFileUploader [data-testid="stFileUploaderDropzoneInstructions"] div,
+            .stFileUploader [data-testid="stFileUploaderDropzoneInstructions"] span {
+                color: #333333 !important;
+            }
+            /* Browse files button */
+            .stFileUploader button,
+            .stFileUploader [data-testid="baseButton-secondary"] {
+                background-color: #FFFFFF !important;
+                color: #000000 !important;
+                border: 1px solid #CCCCCC !important;
+            }
+            /* Cloud icon */
+            .stFileUploader svg,
+            .stFileUploader svg path {
+                color: #666666 !important;
+                fill: #666666 !important;
+                stroke: #666666 !important;
+            }
+            /* Captions */
+            .stCaption, .stCaption span {
+                color: #555555 !important;
+            }
+            /* Mode selection buttons - secondary style for light mode */
+            button[kind="secondary"] {
+                background-color: #F5F5F5 !important;
+                color: #000000 !important;
+                border: 1px solid #CCCCCC !important;
+            }
+            button[kind="secondary"]:hover {
+                background-color: #E8E8E8 !important;
+                border-color: #999999 !important;
+            }
+            /* Primary/selected button */
+            button[kind="primary"] {
+                background-color: #000000 !important;
+                color: #FFFFFF !important;
+                border: none !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
 
         video_tab1, video_tab2 = st.tabs(["Dropbox Link", "Upload"])
 
@@ -12898,7 +13986,7 @@ def main():
 
                     # Download phase
                     status_text.markdown("""
-                    <div style="color: #7B8CDE; font-size: 13px; font-weight: 500;">
+                    <div style="color: #000000; font-size: 13px; font-weight: 500;">
                         Downloading video from Dropbox...
                     </div>
                     """, unsafe_allow_html=True)
@@ -12940,7 +14028,7 @@ def main():
                             <div style="display: flex; justify-content: center; gap: 20px; color: #a1a1aa; font-size: 12px; margin-top: 8px;">
                                 <span>Elapsed: {elapsed_fmt}</span>
                                 <span>ETA: {eta_fmt}</span>
-                                <span style="color: #7B8CDE;">{message}</span>
+                                <span style="color: #000000;">{message}</span>
                             </div>
                             """, unsafe_allow_html=True)
 
@@ -13040,51 +14128,51 @@ def main():
         <div style="text-align: center; margin-bottom: 30px;">
             <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 8px;">
                 {icon('photo_icon', 28)}
-                <h2 style="color: #fff; margin: 0;">Photo Proof</h2>
+                <h2 style="color: {theme['text']}; margin: 0;">Photo Proof</h2>
             </div>
-            <p style="color: #a1a1aa; font-size: 14px;">Complete QA analysis for photo deliverables - singles or entire folders</p>
+            <p style="color: {theme['text_secondary']}; font-size: 14px;">Complete QA analysis for photo deliverables - singles or entire folders</p>
         </div>
         """, unsafe_allow_html=True)
 
-        # Feature overview cards
+        # Feature overview cards - theme aware
         st.markdown(f"""
         <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 30px;">
-            <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 16px; text-align: center;">
+            <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 16px; text-align: center;">
                 <div style="margin-bottom: 8px;">{icon('technical_scan', 24)}</div>
-                <div style="color: #fff; font-weight: 600; font-size: 13px; margin-bottom: 4px;">Technical</div>
-                <div style="color: #71717a; font-size: 11px;">Resolution, file size, format</div>
+                <div style="color: {theme['text']}; font-weight: 600; font-size: 13px; margin-bottom: 4px;">Technical</div>
+                <div style="color: {theme['text_secondary']}; font-size: 11px;">Resolution, file size, format</div>
             </div>
-            <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 16px; text-align: center;">
+            <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 16px; text-align: center;">
                 <div style="margin-bottom: 8px;">{icon('sharpness_check', 24)}</div>
-                <div style="color: #fff; font-weight: 600; font-size: 13px; margin-bottom: 4px;">Sharpness</div>
-                <div style="color: #71717a; font-size: 11px;">Focus, blur detection</div>
+                <div style="color: {theme['text']}; font-weight: 600; font-size: 13px; margin-bottom: 4px;">Sharpness</div>
+                <div style="color: {theme['text_secondary']}; font-size: 11px;">Focus, blur detection</div>
             </div>
-            <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 16px; text-align: center;">
+            <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 16px; text-align: center;">
                 <div style="margin-bottom: 8px;">{icon('exposure_color', 24)}</div>
-                <div style="color: #fff; font-weight: 600; font-size: 13px; margin-bottom: 4px;">Exposure</div>
-                <div style="color: #71717a; font-size: 11px;">Brightness, contrast, HDR</div>
+                <div style="color: {theme['text']}; font-weight: 600; font-size: 13px; margin-bottom: 4px;">Exposure</div>
+                <div style="color: {theme['text_secondary']}; font-size: 11px;">Brightness, contrast, HDR</div>
             </div>
-            <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 16px; text-align: center;">
+            <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 16px; text-align: center;">
                 <div style="margin-bottom: 8px;">{icon('composition', 24)}</div>
-                <div style="color: #fff; font-weight: 600; font-size: 13px; margin-bottom: 4px;">Quality</div>
-                <div style="color: #71717a; font-size: 11px;">Noise, artifacts, export</div>
+                <div style="color: {theme['text']}; font-weight: 600; font-size: 13px; margin-bottom: 4px;">Quality</div>
+                <div style="color: {theme['text_secondary']}; font-size: 11px;">Noise, artifacts, export</div>
             </div>
-            <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 16px; text-align: center;">
+            <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 16px; text-align: center;">
                 <div style="margin-bottom: 8px;">{icon('compliance', 24)}</div>
-                <div style="color: #fff; font-weight: 600; font-size: 13px; margin-bottom: 4px;">Compliance</div>
-                <div style="color: #71717a; font-size: 11px;">Naming, staging</div>
+                <div style="color: {theme['text']}; font-weight: 600; font-size: 13px; margin-bottom: 4px;">Compliance</div>
+                <div style="color: {theme['text_secondary']}; font-size: 11px;">Naming, staging</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-        # How it Works section
+        # How it Works section - theme aware
         st.markdown(f"""
-        <div style="background: #111; border: 1px solid #1d1d1f; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+        <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
                 {icon('info', 18)}
-                <span style="color: #fff; font-weight: 600; font-size: 15px;">How it Works</span>
+                <span style="color: {theme['text']}; font-weight: 600; font-size: 15px;">How it Works</span>
             </div>
-            <ol style="color: #a1a1aa; font-size: 13px; margin: 0; padding-left: 20px; line-height: 1.8;">
+            <ol style="color: {theme['text_secondary']}; font-size: 13px; margin: 0; padding-left: 20px; line-height: 1.8;">
                 <li>Paste your Dropbox shared folder link below</li>
                 <li>We analyze all photos for sharpness, exposure, color, and more</li>
                 <li>Photos are also scanned for room type to help train video detection</li>
@@ -13092,6 +14180,103 @@ def main():
             </ol>
         </div>
         """, unsafe_allow_html=True)
+
+        # Force light mode styles for tabs and inputs
+        if theme['bg'] == '#FFFFFF':
+            st.markdown("""
+            <style>
+            /* FORCE Light mode for tabs */
+            .stTabs [data-baseweb="tab-list"] {
+                background: #F0F0F0 !important;
+                border-radius: 10px !important;
+                padding: 6px !important;
+            }
+            .stTabs [data-baseweb="tab"] {
+                color: #333333 !important;
+                background: transparent !important;
+                font-weight: 500 !important;
+            }
+            .stTabs [aria-selected="true"] {
+                background: #FFFFFF !important;
+                color: #000000 !important;
+                font-weight: 600 !important;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+                border-radius: 8px !important;
+            }
+            /* FORCE Light mode for text inputs */
+            .stTextInput > div > div > input {
+                background-color: #FFFFFF !important;
+                color: #000000 !important;
+                border: 1px solid #CCCCCC !important;
+                border-radius: 8px !important;
+            }
+            .stTextInput > div > div > input::placeholder {
+                color: #888888 !important;
+            }
+            /* FORCE Light mode for file uploader - COMPLETE */
+            .stFileUploader,
+            .stFileUploader > div,
+            .stFileUploader section,
+            .stFileUploader [data-testid="stFileUploaderDropzone"] {
+                background-color: #FAFAFA !important;
+                border: 2px dashed #CCCCCC !important;
+                border-radius: 10px !important;
+            }
+            .stFileUploader label,
+            .stFileUploader span,
+            .stFileUploader p,
+            .stFileUploader div,
+            .stFileUploader [data-testid="stFileUploaderDropzoneInstructions"],
+            .stFileUploader [data-testid="stFileUploaderDropzoneInstructions"] div,
+            .stFileUploader [data-testid="stFileUploaderDropzoneInstructions"] span,
+            .stFileUploader [data-testid="stFileUploaderDropzoneInstructions"] p {
+                color: #333333 !important;
+            }
+            /* Browse files button */
+            .stFileUploader button,
+            .stFileUploader [data-testid="baseButton-secondary"],
+            .stFileUploader section button {
+                background-color: #FFFFFF !important;
+                color: #000000 !important;
+                border: 1px solid #CCCCCC !important;
+                border-radius: 6px !important;
+            }
+            .stFileUploader button:hover {
+                background-color: #F0F0F0 !important;
+                border-color: #999999 !important;
+            }
+            /* Cloud/upload icon */
+            .stFileUploader svg,
+            .stFileUploader [data-testid="stFileUploaderDropzone"] svg {
+                color: #666666 !important;
+                fill: #666666 !important;
+                stroke: #666666 !important;
+            }
+            .stFileUploader svg path {
+                fill: #666666 !important;
+                stroke: #666666 !important;
+            }
+            /* Small text in uploader */
+            .stFileUploader small,
+            .stFileUploader [data-testid="stFileUploaderDropzone"] small {
+                color: #666666 !important;
+            }
+            /* FORCE Light mode for captions */
+            .stCaption, .stCaption span {
+                color: #555555 !important;
+            }
+            /* FORCE Light mode for buttons */
+            .stButton > button {
+                background-color: #000000 !important;
+                color: #FFFFFF !important;
+                border: none !important;
+                border-radius: 8px !important;
+            }
+            .stButton > button:hover {
+                background-color: #333333 !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
 
         photo_tab1, photo_tab2 = st.tabs(["Dropbox Link", "Upload"])
 
@@ -13112,7 +14297,7 @@ def main():
 
                     # Download phase
                     status_text.markdown("""
-                    <div style="color: #7B8CDE; font-size: 13px; font-weight: 500;">
+                    <div style="color: #000000; font-size: 13px; font-weight: 500;">
                         Downloading from Dropbox...
                     </div>
                     """, unsafe_allow_html=True)
@@ -13141,7 +14326,7 @@ def main():
                             """, unsafe_allow_html=True)
 
                             status_text.markdown(f"""
-                            <div style="color: #7B8CDE; font-size: 13px;">Extracting photos...</div>
+                            <div style="color: #000000; font-size: 13px;">Extracting photos...</div>
                             """, unsafe_allow_html=True)
                             photo_paths = extract_zip_photos(tmp_path)
 
@@ -13246,7 +14431,7 @@ def main():
                                 <div style="display: flex; justify-content: center; gap: 20px; color: #a1a1aa; font-size: 12px; margin-top: 8px;">
                                     <span>Elapsed: {elapsed_fmt}</span>
                                     <span>ETA: {eta_fmt}</span>
-                                    <span style="color: #7B8CDE;">{message}</span>
+                                    <span style="color: #000000;">{message}</span>
                                 </div>
                                 """, unsafe_allow_html=True)
 
