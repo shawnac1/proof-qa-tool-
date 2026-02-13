@@ -23,6 +23,14 @@ import numpy as np
 # User authentication and tracking
 from database import user_db, learning_db
 
+# Timeline X modules (optional - for AI timeline assembly)
+try:
+    from timeline_x import TimelineX, ContentFormat
+    from timeline_x_analyzer import ClipAnalyzer, FFProbeAnalyzer, BPMAnalyzer, check_dependencies, format_duration
+    TIMELINE_X_AVAILABLE = True
+except ImportError:
+    TIMELINE_X_AVAILABLE = False
+
 
 # Google OAuth (optional - for team authentication)
 try:
@@ -15826,13 +15834,16 @@ def main():
     # TIMELINE X - AI-Powered Timeline Assembly
     # =============================================
     if app_mode == "Timeline X":
+        # Header
+        timeline_icon = '''<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="7" y2="7"></line><line x1="2" y1="17" x2="7" y2="17"></line><line x1="17" y1="7" x2="22" y2="7"></line><line x1="17" y1="17" x2="22" y2="17"></line></svg>'''
         st.markdown(f"""
         <div style="text-align: center; margin-bottom: 30px;">
             <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 8px;">
+                <span style="color: {theme['text']};">{timeline_icon}</span>
                 <h2 style="color: {theme['text']}; margin: 0;">Timeline X</h2>
-                <span style="background: #8B5CF6; color: white; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px;">BETA</span>
+                <span class="proof-beta-badge">BETA</span>
             </div>
-            <p style="color: {theme['text_secondary']}; font-size: 14px;">AI-powered timeline assembly - analyze footage, make editorial decisions, export to your NLE</p>
+            <p style="color: {theme['text_secondary']}; font-size: 14px;">AI-powered timeline assembly &mdash; analyze footage, make editorial decisions, export to your NLE</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -15845,7 +15856,7 @@ def main():
             </div>
             <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 20px; text-align: center;">
                 <div style="color: {theme['text']}; font-weight: 600; font-size: 14px; margin-bottom: 8px;">Editorial Decisions</div>
-                <div style="color: {theme['text_secondary']}; font-size: 12px;">Built on principles from Murch, Schoonmaker & the masters</div>
+                <div style="color: {theme['text_secondary']}; font-size: 12px;">Built on principles from Murch, Schoonmaker &amp; the masters</div>
             </div>
             <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 20px; text-align: center;">
                 <div style="color: {theme['text']}; font-weight: 600; font-size: 14px; margin-bottom: 8px;">Export to NLE</div>
@@ -15854,7 +15865,182 @@ def main():
         </div>
         """, unsafe_allow_html=True)
 
-        st.info("Timeline X is in active development. Upload functionality coming soon!")
+        # How it Works
+        st.markdown(f"""
+        <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                {icon('info', 18)}
+                <span style="color: {theme['text']}; font-weight: 600; font-size: 15px;">How it Works</span>
+            </div>
+            <ol style="color: {theme['text_secondary']}; font-size: 13px; margin: 0; padding-left: 20px; line-height: 1.8;">
+                <li>Upload your raw video clips (or paste a Dropbox link)</li>
+                <li>Optionally add a music track for beat-synced editing</li>
+                <li>Choose your content format and style preset</li>
+                <li>Timeline X analyzes footage and assembles an edit using editorial principles</li>
+                <li>Export to DaVinci Resolve, Final Cut Pro, or Premiere Pro</li>
+            </ol>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if not TIMELINE_X_AVAILABLE:
+            st.warning("Timeline X modules not found. Please ensure timeline_x.py and timeline_x_analyzer.py are in the app directory.")
+        else:
+            # Configuration
+            st.markdown(f"""
+            <div style="color: {theme['text']}; font-weight: 600; font-size: 15px; margin-bottom: 12px;">Configuration</div>
+            """, unsafe_allow_html=True)
+
+            config_col1, config_col2, config_col3 = st.columns(3)
+            with config_col1:
+                format_options = {
+                    "Real Estate": ContentFormat.REAL_ESTATE,
+                    "Brand Film": ContentFormat.BRAND_FILM,
+                    "Documentary": ContentFormat.DOCUMENTARY,
+                    "Commercial": ContentFormat.COMMERCIAL,
+                    "Music Video": ContentFormat.MUSIC_VIDEO,
+                    "Testimonial": ContentFormat.TESTIMONIAL,
+                    "Social Reel": ContentFormat.SOCIAL_REEL,
+                    "Event Recap": ContentFormat.EVENT_RECAP,
+                    "Wedding": ContentFormat.WEDDING,
+                    "Corporate": ContentFormat.CORPORATE,
+                    "Tutorial": ContentFormat.TUTORIAL,
+                    "Vlog": ContentFormat.VLOG,
+                }
+                selected_format = st.selectbox("Content Format", list(format_options.keys()), key="tlx_format")
+
+            with config_col2:
+                style_presets = ["Cinematic", "Fast-Paced", "Documentary", "Social Media"]
+                selected_style = st.selectbox("Style Preset", style_presets, key="tlx_style")
+
+            with config_col3:
+                target_duration = st.number_input("Target Duration (seconds)", min_value=15, max_value=600, value=120, step=15, key="tlx_duration")
+
+            # Manual BPM input
+            manual_bpm = st.number_input("Manual BPM (optional, leave 0 for auto-detect)", min_value=0, max_value=300, value=0, step=1, key="tlx_bpm")
+
+            st.markdown("---")
+
+            # Input tabs
+            tlx_tab1, tlx_tab2 = st.tabs(["Upload", "Dropbox Link"])
+
+            with tlx_tab1:
+                video_clips = st.file_uploader(
+                    "Upload video clips",
+                    type=['mp4', 'mov', 'avi', 'mkv'],
+                    accept_multiple_files=True,
+                    key="tlx_upload_clips"
+                )
+                music_file = st.file_uploader(
+                    "Upload music track (optional)",
+                    type=['mp3', 'wav', 'aac', 'm4a'],
+                    key="tlx_upload_music"
+                )
+
+                if video_clips:
+                    # Show clip info
+                    st.markdown(f"""
+                    <div style="color: {theme['text']}; font-weight: 600; font-size: 14px; margin: 16px 0 8px 0;">Clips Loaded: {len(video_clips)}</div>
+                    """, unsafe_allow_html=True)
+
+                    clip_data = []
+                    for clip in video_clips:
+                        clip_data.append({
+                            'Filename': clip.name,
+                            'Size': f"{clip.size / (1024*1024):.1f} MB",
+                            'Type': Path(clip.name).suffix.upper(),
+                        })
+
+                    import pandas as pd
+                    df_clips = pd.DataFrame(clip_data)
+                    st.dataframe(df_clips, use_container_width=True, hide_index=True)
+
+                    if st.button("Generate Timeline", key="btn_tlx_generate", use_container_width=True):
+                        with st.spinner("Analyzing clips and assembling timeline..."):
+                            try:
+                                tlx = TimelineX()
+                                tlx.set_format(format_options[selected_format])
+
+                                # Save clips to temp files and analyze
+                                temp_paths = []
+                                for clip in video_clips:
+                                    suffix = Path(clip.name).suffix
+                                    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                                        tmp.write(clip.getvalue())
+                                        temp_paths.append(tmp.name)
+                                        tlx.add_clip_from_file(tmp.name)
+
+                                # Handle music
+                                if music_file:
+                                    music_suffix = Path(music_file.name).suffix
+                                    with tempfile.NamedTemporaryFile(delete=False, suffix=music_suffix) as tmp:
+                                        tmp.write(music_file.getvalue())
+                                        bpm_val = manual_bpm if manual_bpm > 0 else None
+                                        tlx.set_music(tmp.name, bpm=bpm_val, auto_detect=(bpm_val is None))
+                                elif manual_bpm > 0:
+                                    tlx.set_music(None, bpm=float(manual_bpm))
+
+                                # Generate
+                                timeline = tlx.generate_timeline(target_duration=float(target_duration))
+
+                                st.success(f"Timeline assembled: {len(video_clips)} clips → {target_duration}s {selected_format} edit")
+
+                                # Show timeline summary
+                                st.markdown(f"""
+                                <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 12px; padding: 24px; margin: 16px 0;">
+                                    <div style="color: rgba(255,255,255,0.8); font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Timeline Generated</div>
+                                    <div style="color: white; font-size: 24px; font-weight: 700; margin-top: 4px;">{selected_format} &middot; {selected_style}</div>
+                                    <div style="color: rgba(255,255,255,0.7); font-size: 14px; margin-top: 4px;">{len(video_clips)} clips &middot; {target_duration}s target duration</div>
+                                </div>
+                                """, unsafe_allow_html=True)
+
+                                # Export buttons
+                                st.markdown(f"""
+                                <div style="color: {theme['text']}; font-weight: 600; font-size: 15px; margin: 20px 0 12px 0;">Export Timeline</div>
+                                """, unsafe_allow_html=True)
+
+                                exp_col1, exp_col2, exp_col3 = st.columns(3)
+                                with exp_col1:
+                                    resolve_path = tempfile.mktemp(suffix='_resolve.xml')
+                                    tlx.export_davinci(resolve_path)
+                                    with open(resolve_path, 'r') as f:
+                                        st.download_button("DaVinci Resolve XML", f.read(), file_name="timeline_resolve.xml", mime="application/xml", use_container_width=True)
+                                    os.unlink(resolve_path)
+
+                                with exp_col2:
+                                    fcp_path = tempfile.mktemp(suffix='_fcp.fcpxml')
+                                    tlx.export_fcpxml(fcp_path)
+                                    with open(fcp_path, 'r') as f:
+                                        st.download_button("Final Cut Pro FCPXML", f.read(), file_name="timeline_fcp.fcpxml", mime="application/xml", use_container_width=True)
+                                    os.unlink(fcp_path)
+
+                                with exp_col3:
+                                    premiere_path = tempfile.mktemp(suffix='_premiere.xml')
+                                    tlx.export_premiere(premiere_path)
+                                    with open(premiere_path, 'r') as f:
+                                        st.download_button("Premiere Pro XML", f.read(), file_name="timeline_premiere.xml", mime="application/xml", use_container_width=True)
+                                    os.unlink(premiere_path)
+
+                                # Cleanup temp files
+                                for p in temp_paths:
+                                    try:
+                                        os.unlink(p)
+                                    except:
+                                        pass
+
+                            except Exception as e:
+                                st.error(f"Error generating timeline: {str(e)}")
+
+            with tlx_tab2:
+                tlx_dropbox = st.text_input(
+                    "Dropbox Link",
+                    placeholder="Paste Dropbox folder link with video clips...",
+                    key="tlx_dropbox",
+                    label_visibility="collapsed"
+                )
+                st.caption("Paste a Dropbox shared folder link containing your video clips")
+
+                if tlx_dropbox:
+                    st.info("Dropbox integration for Timeline X coming soon. Please use the Upload tab for now.")
 
     # =============================================
     # DIRECTOR X - AI Creative Director Feedback
