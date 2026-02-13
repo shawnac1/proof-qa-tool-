@@ -16046,13 +16046,18 @@ def main():
     # DIRECTOR X - AI Creative Director Feedback
     # =============================================
     if app_mode == "Director X":
+        # Director X icon (clapperboard)
+        director_icon = '''<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2l10 0"></path><path d="M2 7l20 0"></path><rect x="2" y="7" width="20" height="15" rx="2"></rect><path d="M7 2l-2 5"></path><path d="M12 2l-2 5"></path><path d="M17 2l-2 5"></path></svg>'''
+
+        # Header
         st.markdown(f"""
         <div style="text-align: center; margin-bottom: 30px;">
             <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 8px;">
+                <span style="color: {theme['text']};">{director_icon}</span>
                 <h2 style="color: {theme['text']}; margin: 0;">Director X</h2>
-                <span style="background: #8B5CF6; color: white; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px;">BETA</span>
+                <span class="proof-beta-badge">BETA</span>
             </div>
-            <p style="color: {theme['text_secondary']}; font-size: 14px;">AI creative director - get professional feedback, ratings, and improvement suggestions</p>
+            <p style="color: {theme['text_secondary']}; font-size: 14px;">AI-powered creative analysis &mdash; get professional feedback, ratings, and improvement suggestions</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -16061,11 +16066,11 @@ def main():
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 30px;">
             <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 20px; text-align: center;">
                 <div style="color: {theme['text']}; font-weight: 600; font-size: 14px; margin-bottom: 8px;">Video Review</div>
-                <div style="color: {theme['text_secondary']}; font-size: 12px;">Upload your edit for comprehensive analysis</div>
+                <div style="color: {theme['text_secondary']}; font-size: 12px;">Upload your edit for comprehensive AI analysis</div>
             </div>
             <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 20px; text-align: center;">
                 <div style="color: {theme['text']}; font-weight: 600; font-size: 14px; margin-bottom: 8px;">Director Score</div>
-                <div style="color: {theme['text_secondary']}; font-size: 12px;">Get a professional rating with detailed breakdown</div>
+                <div style="color: {theme['text_secondary']}; font-size: 12px;">Professional rating out of 100 with detailed breakdown</div>
             </div>
             <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 20px; text-align: center;">
                 <div style="color: {theme['text']}; font-weight: 600; font-size: 14px; margin-bottom: 8px;">Improvement Notes</div>
@@ -16074,7 +16079,352 @@ def main():
         </div>
         """, unsafe_allow_html=True)
 
-        st.info("Director X is in active development. Review functionality coming soon!")
+        # How it Works
+        st.markdown(f"""
+        <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                {icon('info', 18)}
+                <span style="color: {theme['text']}; font-weight: 600; font-size: 15px;">How it Works</span>
+            </div>
+            <ol style="color: {theme['text_secondary']}; font-size: 13px; margin: 0; padding-left: 20px; line-height: 1.8;">
+                <li>Upload your edited video (or paste a Dropbox link)</li>
+                <li>Choose analysis depth &mdash; Quick, Standard, or Deep</li>
+                <li>AI extracts key frames and analyzes storytelling, color, pacing &amp; more</li>
+                <li>Get a Director Score out of 100 with category breakdown and actionable notes</li>
+            </ol>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Thoroughness selector
+        st.markdown(f"""
+        <div style="margin-bottom: 6px;">
+            <span style="color: {theme['text']}; font-weight: 600; font-size: 14px;">Analysis Depth</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        depth_options = {
+            "Quick (3 frames)": 3,
+            "Standard (8 frames)": 8,
+            "Deep (15 frames)": 15
+        }
+        dx_depth = st.radio(
+            "Analysis depth",
+            list(depth_options.keys()),
+            index=1,
+            horizontal=True,
+            label_visibility="collapsed"
+        )
+        dx_num_frames = depth_options[dx_depth]
+
+        st.markdown(f"""
+        <p style="color: {theme['text_muted']}; font-size: 12px; margin-top: -10px; margin-bottom: 20px;">
+            {'Fast overview — samples 3 key moments' if dx_num_frames == 3 else 'Balanced analysis — samples 8 key moments' if dx_num_frames == 8 else 'Comprehensive review — samples 15 moments across your edit'}
+        </p>
+        """, unsafe_allow_html=True)
+
+        # Upload section with tabs
+        dx_tab_upload, dx_tab_dropbox = st.tabs(["Upload", "Dropbox Link"])
+
+        dx_video_file = None
+        with dx_tab_upload:
+            dx_video_file = st.file_uploader(
+                "Upload your edited video",
+                type=["mp4", "mov", "avi", "mkv"],
+                key="director_x_upload",
+                help="Supported: MP4, MOV, AVI, MKV"
+            )
+
+        with dx_tab_dropbox:
+            dx_dropbox = st.text_input(
+                "Dropbox shared link",
+                placeholder="https://www.dropbox.com/s/...",
+                key="director_x_dropbox"
+            )
+            st.caption("Paste a Dropbox shared link to your edited video")
+            if dx_dropbox:
+                st.info("Dropbox integration for Director X coming soon. Please use the Upload tab for now.")
+
+        # Process uploaded video
+        if dx_video_file is not None:
+            # Save to temp file
+            import tempfile
+            dx_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{dx_video_file.name.split('.')[-1]}")
+            dx_tmp.write(dx_video_file.read())
+            dx_tmp_path = dx_tmp.name
+            dx_tmp.close()
+
+            # Get video metadata with ffprobe
+            try:
+                import subprocess
+                probe_cmd = [
+                    "ffprobe", "-v", "quiet", "-print_format", "json",
+                    "-show_format", "-show_streams", dx_tmp_path
+                ]
+                probe_result = subprocess.run(probe_cmd, capture_output=True, text=True, timeout=30)
+                dx_metadata = json.loads(probe_result.stdout) if probe_result.returncode == 0 else {}
+            except Exception:
+                dx_metadata = {}
+
+            # Display video info card
+            if dx_metadata:
+                dx_video_stream = next((s for s in dx_metadata.get('streams', []) if s.get('codec_type') == 'video'), {})
+                dx_duration = float(dx_metadata.get('format', {}).get('duration', 0))
+                dx_width = dx_video_stream.get('width', 'N/A')
+                dx_height = dx_video_stream.get('height', 'N/A')
+                dx_fps = 'N/A'
+                if dx_video_stream.get('r_frame_rate'):
+                    fps_parts = dx_video_stream['r_frame_rate'].split('/')
+                    if len(fps_parts) == 2 and int(fps_parts[1]) > 0:
+                        dx_fps = f"{int(fps_parts[0]) / int(fps_parts[1]):.2f}"
+
+                dx_mins = int(dx_duration // 60)
+                dx_secs = int(dx_duration % 60)
+
+                st.markdown(f"""
+                <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 16px; margin: 16px 0;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                        <span style="color: {theme['text']}; font-weight: 600; font-size: 14px;">Video Details</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+                        <div style="text-align: center;">
+                            <div style="color: {theme['text_muted']}; font-size: 11px; margin-bottom: 4px;">Duration</div>
+                            <div style="color: {theme['text']}; font-weight: 600; font-size: 14px;">{dx_mins}:{dx_secs:02d}</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="color: {theme['text_muted']}; font-size: 11px; margin-bottom: 4px;">Resolution</div>
+                            <div style="color: {theme['text']}; font-weight: 600; font-size: 14px;">{dx_width}x{dx_height}</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="color: {theme['text_muted']}; font-size: 11px; margin-bottom: 4px;">Frame Rate</div>
+                            <div style="color: {theme['text']}; font-weight: 600; font-size: 14px;">{dx_fps} fps</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="color: {theme['text_muted']}; font-size: 11px; margin-bottom: 4px;">Frames to Analyze</div>
+                            <div style="color: {theme['text']}; font-weight: 600; font-size: 14px;">{dx_num_frames}</div>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                dx_duration = 0
+
+            # Analyze button
+            if st.button("Analyze Video", type="primary", use_container_width=True, key="dx_analyze_btn"):
+                if dx_duration < 1:
+                    st.error("Could not read video duration. Please try a different file.")
+                else:
+                    # Check for API key
+                    api_key = None
+                    try:
+                        api_key = st.secrets.get("anthropic", {}).get("api_key")
+                    except Exception:
+                        pass
+
+                    if not api_key:
+                        st.error("Anthropic API key not configured. Please add it to .streamlit/secrets.toml")
+                    else:
+                        with st.spinner("Extracting frames..."):
+                            # Extract frames at evenly spaced intervals
+                            import subprocess
+                            dx_frames = []
+                            dx_frame_times = []
+
+                            for i in range(dx_num_frames):
+                                t = (dx_duration / (dx_num_frames + 1)) * (i + 1)
+                                dx_frame_times.append(t)
+                                frame_path = dx_tmp_path + f"_frame_{i}.jpg"
+                                try:
+                                    subprocess.run([
+                                        "ffmpeg", "-y", "-ss", str(t), "-i", dx_tmp_path,
+                                        "-frames:v", "1", "-q:v", "2", frame_path
+                                    ], capture_output=True, timeout=15)
+                                    if os.path.exists(frame_path):
+                                        dx_frames.append((frame_path, t))
+                                except Exception:
+                                    pass
+
+                        if not dx_frames:
+                            st.error("Could not extract frames from this video. Please try a different format.")
+                        else:
+                            # Show extracted frames
+                            st.markdown(f"""
+                            <div style="margin: 16px 0 8px 0;">
+                                <span style="color: {theme['text']}; font-weight: 600; font-size: 14px;">Sampled Frames ({len(dx_frames)})</span>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                            # Display frame thumbnails in a grid
+                            frame_cols = st.columns(min(len(dx_frames), 5))
+                            for idx, (fp, t) in enumerate(dx_frames):
+                                col_idx = idx % min(len(dx_frames), 5)
+                                with frame_cols[col_idx]:
+                                    from PIL import Image
+                                    img = Image.open(fp)
+                                    st.image(img, caption=f"{int(t//60)}:{int(t%60):02d}", use_container_width=True)
+
+                            # Send frames to Claude Vision API
+                            with st.spinner("AI is reviewing your edit..."):
+                                import anthropic
+                                import base64
+
+                                client = anthropic.Anthropic(api_key=api_key)
+
+                                # Build message content with frames
+                                content_blocks = []
+                                content_blocks.append({
+                                    "type": "text",
+                                    "text": f"You are Director X, a world-class creative director and film critic. Analyze this edited video ({dx_mins}:{dx_secs:02d} duration, {dx_width}x{dx_height}, {dx_fps} fps). I'm showing you {len(dx_frames)} frames sampled at key moments throughout the edit. Analyze each frame and the overall edit for:\n\n1. **Storytelling** (narrative flow, shot selection, visual communication)\n2. **Pacing** (rhythm, timing, shot duration variety)\n3. **Color Grading** (consistency, mood, palette choices)\n4. **Composition** (framing, rule of thirds, leading lines, depth)\n5. **Sound Design** (infer from visual cues - cuts on action, music-driven edits)\n6. **Emotional Impact** (does it engage, surprise, or move the viewer?)\n\nFor each category, give a score from 0-100 and brief notes.\n\nThen provide:\n- **Overall Director Score** (weighted average, 0-100)\n- **Tier** (A+ = 95-100, A = 85-94, B = 70-84, C = 55-69, D = 40-54, F = below 40)\n- **Top 3 Strengths** (what's working well)\n- **Top 3 Improvement Notes** (specific, actionable feedback)\n\nFormat your response EXACTLY as JSON like this:\n```json\n{{\n  \"overall_score\": 82,\n  \"tier\": \"B\",\n  \"categories\": {{\n    \"storytelling\": {{\"score\": 80, \"notes\": \"...\"}},\n    \"pacing\": {{\"score\": 85, \"notes\": \"...\"}},\n    \"color_grading\": {{\"score\": 78, \"notes\": \"...\"}},\n    \"composition\": {{\"score\": 84, \"notes\": \"...\"}},\n    \"sound_design\": {{\"score\": 75, \"notes\": \"...\"}},\n    \"emotional_impact\": {{\"score\": 82, \"notes\": \"...\"}}\n  }},\n  \"strengths\": [\"...\", \"...\", \"...\"],\n  \"improvements\": [\"...\", \"...\", \"...\"],\n  \"summary\": \"A 2-3 sentence overall creative assessment.\"\n}}\n```\nReturn ONLY the JSON, no other text."
+                                })
+
+                                for fp, t in dx_frames:
+                                    with open(fp, "rb") as f:
+                                        img_data = base64.b64encode(f.read()).decode("utf-8")
+                                    content_blocks.append({
+                                        "type": "image",
+                                        "source": {
+                                            "type": "base64",
+                                            "media_type": "image/jpeg",
+                                            "data": img_data
+                                        }
+                                    })
+                                    content_blocks.append({
+                                        "type": "text",
+                                        "text": f"Frame at {int(t//60)}:{int(t%60):02d}"
+                                    })
+
+                                try:
+                                    dx_response = client.messages.create(
+                                        model="claude-sonnet-4-5-20250929",
+                                        max_tokens=2000,
+                                        messages=[{"role": "user", "content": content_blocks}]
+                                    )
+
+                                    dx_result_text = dx_response.content[0].text.strip()
+                                    # Extract JSON from response
+                                    if "```json" in dx_result_text:
+                                        dx_result_text = dx_result_text.split("```json")[1].split("```")[0].strip()
+                                    elif "```" in dx_result_text:
+                                        dx_result_text = dx_result_text.split("```")[1].split("```")[0].strip()
+
+                                    dx_result = json.loads(dx_result_text)
+
+                                    # Display Director Score
+                                    overall = dx_result.get("overall_score", 0)
+                                    tier = dx_result.get("tier", "?")
+                                    summary = dx_result.get("summary", "")
+
+                                    # Tier color
+                                    tier_colors = {
+                                        "A+": "#06C167", "A": "#06C167",
+                                        "B": "#2D9CDB", "C": "#FFB800",
+                                        "D": "#FF8C00", "F": "#FF4D4D"
+                                    }
+                                    tier_color = tier_colors.get(tier, theme['text_secondary'])
+
+                                    st.markdown(f"""
+                                    <div style="background: {theme['card']}; border: 2px solid {tier_color}; border-radius: 16px; padding: 30px; margin: 24px 0; text-align: center;">
+                                        <div style="color: {theme['text_muted']}; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Director Score</div>
+                                        <div style="font-size: 64px; font-weight: 700; color: {tier_color}; line-height: 1;">{overall}</div>
+                                        <div style="font-size: 28px; font-weight: 600; color: {tier_color}; margin-top: 4px;">{tier}</div>
+                                        <div style="color: {theme['text_secondary']}; font-size: 14px; margin-top: 12px; max-width: 500px; margin-left: auto; margin-right: auto;">{summary}</div>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+
+                                    # Category breakdown
+                                    categories = dx_result.get("categories", {})
+                                    cat_labels = {
+                                        "storytelling": "Storytelling",
+                                        "pacing": "Pacing",
+                                        "color_grading": "Color Grading",
+                                        "composition": "Composition",
+                                        "sound_design": "Sound Design",
+                                        "emotional_impact": "Emotional Impact"
+                                    }
+
+                                    st.markdown(f"""
+                                    <div style="margin: 24px 0 12px 0;">
+                                        <span style="color: {theme['text']}; font-weight: 600; font-size: 16px;">Category Breakdown</span>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+
+                                    for cat_key, cat_label in cat_labels.items():
+                                        cat_data = categories.get(cat_key, {})
+                                        cat_score = cat_data.get("score", 0)
+                                        cat_notes = cat_data.get("notes", "")
+
+                                        # Progress bar color based on score
+                                        if cat_score >= 85:
+                                            bar_color = "#06C167"
+                                        elif cat_score >= 70:
+                                            bar_color = "#2D9CDB"
+                                        elif cat_score >= 55:
+                                            bar_color = "#FFB800"
+                                        else:
+                                            bar_color = "#FF4D4D"
+
+                                        st.markdown(f"""
+                                        <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 10px; padding: 16px; margin-bottom: 10px;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                                <span style="color: {theme['text']}; font-weight: 600; font-size: 14px;">{cat_label}</span>
+                                                <span style="color: {bar_color}; font-weight: 700; font-size: 18px;">{cat_score}</span>
+                                            </div>
+                                            <div style="background: {theme['border']}; border-radius: 4px; height: 6px; overflow: hidden; margin-bottom: 8px;">
+                                                <div style="background: {bar_color}; height: 100%; width: {cat_score}%; border-radius: 4px;"></div>
+                                            </div>
+                                            <div style="color: {theme['text_secondary']}; font-size: 12px;">{cat_notes}</div>
+                                        </div>
+                                        """, unsafe_allow_html=True)
+
+                                    # Strengths
+                                    strengths = dx_result.get("strengths", [])
+                                    if strengths:
+                                        st.markdown(f"""
+                                        <div style="background: {theme['card']}; border: 1px solid #06C167; border-radius: 12px; padding: 20px; margin: 20px 0;">
+                                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                                {icon('pass', 18)}
+                                                <span style="color: {theme['text']}; font-weight: 600; font-size: 15px;">Strengths</span>
+                                            </div>
+                                            <ul style="color: {theme['text_secondary']}; font-size: 13px; margin: 0; padding-left: 20px; line-height: 1.8;">
+                                                {''.join(f'<li>{s}</li>' for s in strengths)}
+                                            </ul>
+                                        </div>
+                                        """, unsafe_allow_html=True)
+
+                                    # Improvements
+                                    improvements = dx_result.get("improvements", [])
+                                    if improvements:
+                                        st.markdown(f"""
+                                        <div style="background: {theme['card']}; border: 1px solid #FFB800; border-radius: 12px; padding: 20px; margin: 20px 0;">
+                                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                                {icon('warning', 18)}
+                                                <span style="color: {theme['text']}; font-weight: 600; font-size: 15px;">Improvement Notes</span>
+                                            </div>
+                                            <ul style="color: {theme['text_secondary']}; font-size: 13px; margin: 0; padding-left: 20px; line-height: 1.8;">
+                                                {''.join(f'<li>{imp}</li>' for imp in improvements)}
+                                            </ul>
+                                        </div>
+                                        """, unsafe_allow_html=True)
+
+                                except json.JSONDecodeError:
+                                    st.error("Could not parse AI response. Please try again.")
+                                    st.code(dx_result_text, language="text")
+                                except anthropic.APIError as e:
+                                    st.error(f"API error: {str(e)}")
+                                except Exception as e:
+                                    st.error(f"Analysis failed: {str(e)}")
+
+                            # Cleanup frames
+                            for fp, _ in dx_frames:
+                                try:
+                                    os.unlink(fp)
+                                except Exception:
+                                    pass
+
+            # Cleanup temp video
+            try:
+                os.unlink(dx_tmp_path)
+            except Exception:
+                pass
 
     # Footer with stats
     render_footer()
