@@ -2454,9 +2454,9 @@ def check_authentication():
     # Check if we have valid auth in session state
     if 'user_info' in st.session_state and st.session_state.user_info:
         user_info = st.session_state.user_info
-        # Re-check team membership every time (in case it wasn't set correctly)
+        # Re-check team membership every time using database logic
         if 'email' in user_info:
-            user_info['is_team'] = user_info.get('email', '').lower().endswith('@aerialcanvas.com')
+            user_info['is_team'] = user_db.is_team_member(user_info.get('email', ''))
         return True, user_info
 
     # Check for restore_session query param (from localStorage redirect)
@@ -2471,7 +2471,7 @@ def check_authentication():
             'email': restore_email,
             'name': restore_name or '',
             'picture_url': restore_picture or '',
-            'is_team': restore_email.lower().endswith('@aerialcanvas.com')
+            'is_team': user_db.is_team_member(restore_email)
         }
         st.session_state.user_info = user_info
 
