@@ -10704,13 +10704,13 @@ def display_auto_sort(sort_type="Video"):
 
                 with mode_col1:
                     is_selected = st.session_state.analysis_mode_dropbox == 'timeline_only'
-                    border_color = "#4ade80" if is_selected else "#1d1d1f"
-                    bg_color = "rgba(74, 222, 128, 0.08)" if is_selected else "#111"
+                    border_color = "#4ade80" if is_selected else "#E0E0E0"
+                    bg_color = "rgba(74, 222, 128, 0.08)" if is_selected else "#FAFAFA"
                     st.markdown(f"""
                     <div style="background: {bg_color}; border: 2px solid {border_color}; border-radius: 12px; padding: 20px 16px 24px 16px; text-align: center;">
                         <div style="margin-bottom: 10px;">{icon('mode_timeline', 28)}</div>
-                        <div style="color: #fff; font-weight: 600; font-size: 14px; margin-bottom: 8px;">Timeline Only</div>
-                        <div style="color: #71717a; font-size: 11px; line-height: 1.5;">Fastest (~1s/clip)<br>Room sorting + auto-structure<br>Uses full clips</div>
+                        <div style="color: #000000; font-weight: 600; font-size: 14px; margin-bottom: 8px;">Timeline Only</div>
+                        <div style="color: #666666; font-size: 11px; line-height: 1.5;">Fastest (~1s/clip)<br>Room sorting + auto-structure<br>Uses full clips</div>
                     </div>
                     """, unsafe_allow_html=True)
                     if st.button("Select", key="mode_timeline", use_container_width=True, type="primary" if is_selected else "secondary"):
@@ -10719,13 +10719,13 @@ def display_auto_sort(sort_type="Video"):
 
                 with mode_col2:
                     is_selected = st.session_state.analysis_mode_dropbox == 'quick'
-                    border_color = "#4ade80" if is_selected else "#1d1d1f"
-                    bg_color = "rgba(74, 222, 128, 0.08)" if is_selected else "#111"
+                    border_color = "#4ade80" if is_selected else "#E0E0E0"
+                    bg_color = "rgba(74, 222, 128, 0.08)" if is_selected else "#FAFAFA"
                     st.markdown(f"""
                     <div style="background: {bg_color}; border: 2px solid {border_color}; border-radius: 12px; padding: 20px 16px 24px 16px; text-align: center;">
                         <div style="margin-bottom: 10px;">{icon('mode_quick', 28)}</div>
-                        <div style="color: #fff; font-weight: 600; font-size: 14px; margin-bottom: 8px;">Quick Mode</div>
-                        <div style="color: #71717a; font-size: 11px; line-height: 1.5;">Fast (~2s/clip)<br>Adds trim detection<br>15% in/out heuristic</div>
+                        <div style="color: #000000; font-weight: 600; font-size: 14px; margin-bottom: 8px;">Quick Mode</div>
+                        <div style="color: #666666; font-size: 11px; line-height: 1.5;">Fast (~2s/clip)<br>Adds trim detection<br>15% in/out heuristic</div>
                     </div>
                     """, unsafe_allow_html=True)
                     if st.button("Select", key="mode_quick", use_container_width=True, type="primary" if is_selected else "secondary"):
@@ -10734,13 +10734,13 @@ def display_auto_sort(sort_type="Video"):
 
                 with mode_col3:
                     is_selected = st.session_state.analysis_mode_dropbox == 'full'
-                    border_color = "#4ade80" if is_selected else "#1d1d1f"
-                    bg_color = "rgba(74, 222, 128, 0.08)" if is_selected else "#111"
+                    border_color = "#4ade80" if is_selected else "#E0E0E0"
+                    bg_color = "rgba(74, 222, 128, 0.08)" if is_selected else "#FAFAFA"
                     st.markdown(f"""
                     <div style="background: {bg_color}; border: 2px solid {border_color}; border-radius: 12px; padding: 20px 16px 24px 16px; text-align: center;">
                         <div style="margin-bottom: 10px;">{icon('mode_full', 28)}</div>
-                        <div style="color: #fff; font-weight: 600; font-size: 14px; margin-bottom: 8px;">Full Analysis</div>
-                        <div style="color: #71717a; font-size: 11px; line-height: 1.5;">Detailed (~15s/clip)<br>Precise trim points<br>Optical flow analysis</div>
+                        <div style="color: #000000; font-weight: 600; font-size: 14px; margin-bottom: 8px;">Full Analysis</div>
+                        <div style="color: #666666; font-size: 11px; line-height: 1.5;">Detailed (~15s/clip)<br>Precise trim points<br>Optical flow analysis</div>
                     </div>
                     """, unsafe_allow_html=True)
                     if st.button("Select", key="mode_full", use_container_width=True, type="primary" if is_selected else "secondary"):
@@ -11738,13 +11738,13 @@ def display_auto_sort(sort_type="Video"):
 
         with mode_col1:
             is_selected = st.session_state.analysis_mode_local == 'timeline_only'
-            border_color = "#4ade80" if is_selected else "#1d1d1f"
-            bg_color = "rgba(74, 222, 128, 0.08)" if is_selected else "#111"
+            border_color = "#4ade80" if is_selected else "#E0E0E0"
+            bg_color = "rgba(74, 222, 128, 0.08)" if is_selected else "#FAFAFA"
             st.markdown(f"""
             <div style="background: {bg_color}; border: 2px solid {border_color}; border-radius: 12px; padding: 20px 16px 24px 16px; text-align: center;">
                 <div style="margin-bottom: 10px;">{icon('mode_timeline', 28)}</div>
-                <div style="color: #fff; font-weight: 600; font-size: 14px; margin-bottom: 8px;">Timeline Only</div>
-                <div style="color: #71717a; font-size: 11px; line-height: 1.5;">Fastest (~1s/clip)<br>Room sorting + auto-structure<br>Uses full clips</div>
+                <div style="color: #000000; font-weight: 600; font-size: 14px; margin-bottom: 8px;">Timeline Only</div>
+                <div style="color: #666666; font-size: 11px; line-height: 1.5;">Fastest (~1s/clip)<br>Room sorting + auto-structure<br>Uses full clips</div>
             </div>
             """, unsafe_allow_html=True)
             if st.button("Select", key="local_mode_timeline", use_container_width=True, type="primary" if is_selected else "secondary"):
@@ -11753,13 +11753,13 @@ def display_auto_sort(sort_type="Video"):
 
         with mode_col2:
             is_selected = st.session_state.analysis_mode_local == 'quick'
-            border_color = "#4ade80" if is_selected else "#1d1d1f"
-            bg_color = "rgba(74, 222, 128, 0.08)" if is_selected else "#111"
+            border_color = "#4ade80" if is_selected else "#E0E0E0"
+            bg_color = "rgba(74, 222, 128, 0.08)" if is_selected else "#FAFAFA"
             st.markdown(f"""
             <div style="background: {bg_color}; border: 2px solid {border_color}; border-radius: 12px; padding: 20px 16px 24px 16px; text-align: center;">
                 <div style="margin-bottom: 10px;">{icon('mode_quick', 28)}</div>
-                <div style="color: #fff; font-weight: 600; font-size: 14px; margin-bottom: 8px;">Quick Mode</div>
-                <div style="color: #71717a; font-size: 11px; line-height: 1.5;">Fast (~2s/clip)<br>Adds trim detection<br>15% in/out heuristic</div>
+                <div style="color: #000000; font-weight: 600; font-size: 14px; margin-bottom: 8px;">Quick Mode</div>
+                <div style="color: #666666; font-size: 11px; line-height: 1.5;">Fast (~2s/clip)<br>Adds trim detection<br>15% in/out heuristic</div>
             </div>
             """, unsafe_allow_html=True)
             if st.button("Select", key="local_mode_quick", use_container_width=True, type="primary" if is_selected else "secondary"):
@@ -11768,13 +11768,13 @@ def display_auto_sort(sort_type="Video"):
 
         with mode_col3:
             is_selected = st.session_state.analysis_mode_local == 'full'
-            border_color = "#4ade80" if is_selected else "#1d1d1f"
-            bg_color = "rgba(74, 222, 128, 0.08)" if is_selected else "#111"
+            border_color = "#4ade80" if is_selected else "#E0E0E0"
+            bg_color = "rgba(74, 222, 128, 0.08)" if is_selected else "#FAFAFA"
             st.markdown(f"""
             <div style="background: {bg_color}; border: 2px solid {border_color}; border-radius: 12px; padding: 20px 16px 24px 16px; text-align: center;">
                 <div style="margin-bottom: 10px;">{icon('mode_full', 28)}</div>
-                <div style="color: #fff; font-weight: 600; font-size: 14px; margin-bottom: 8px;">Full Analysis</div>
-                <div style="color: #71717a; font-size: 11px; line-height: 1.5;">Detailed (~15s/clip)<br>Precise trim points<br>Optical flow analysis</div>
+                <div style="color: #000000; font-weight: 600; font-size: 14px; margin-bottom: 8px;">Full Analysis</div>
+                <div style="color: #666666; font-size: 11px; line-height: 1.5;">Detailed (~15s/clip)<br>Precise trim points<br>Optical flow analysis</div>
             </div>
             """, unsafe_allow_html=True)
             if st.button("Select", key="local_mode_full", use_container_width=True, type="primary" if is_selected else "secondary"):
@@ -13865,8 +13865,8 @@ def main():
     }
 
     /* Typography */
-    h1, h2, h3, h4, h5 { color: #fff !important; font-weight: 600 !important; }
-    p, span, label, div { color: #a1a1aa !important; }
+    h1, h2, h3, h4, h5 { color: #000000 !important; font-weight: 600 !important; }
+    p, span, label, div { color: #333333 !important; }
 
     /* Hero */
     .hero-section {
@@ -13874,10 +13874,10 @@ def main():
         padding: 20px 20px 15px;
     }
     .hero-title { font-size: 40px; color: #000000 !important; }
-    .hero-subtitle { color: #71717a !important; }
+    .hero-subtitle { color: #555555 !important; }
     .tagline {
         font-size: 15px;
-        color: #a1a1aa !important;
+        color: #555555 !important;
         margin-top: 12px;
         font-weight: 400;
         letter-spacing: 0.01em;
@@ -13885,8 +13885,8 @@ def main():
 
     /* Cards */
     .upload-card {
-        background: #111;
-        border: 1px solid #1d1d1f;
+        background: #FAFAFA;
+        border: 1px solid #E0E0E0;
         border-radius: 12px;
         padding: 20px;
         margin-bottom: 8px;
@@ -13898,8 +13898,8 @@ def main():
         border-radius: 8px;
         display: flex; align-items: center; justify-content: center;
     }
-    .card-title { font-size: 15px; font-weight: 600; color: #fff !important; margin: 0; }
-    .card-desc { font-size: 12px; color: #71717a !important; margin: 0; }
+    .card-title { font-size: 15px; font-weight: 600; color: #000000 !important; margin: 0; }
+    .card-desc { font-size: 12px; color: #555555 !important; margin: 0; }
 
     /* Feature Tags - Horizontal with checkmarks */
     .feature-tags {
@@ -13910,7 +13910,7 @@ def main():
     }
     .feature-tag {
         background: transparent;
-        color: #a1a1aa !important;
+        color: #555555 !important;
         font-size: 12px;
         font-weight: 400;
         padding: 0;
@@ -13924,10 +13924,10 @@ def main():
         font-size: 11px;
     }
 
-    /* Tabs - Purple pill style with smooth color transitions */
+    /* Tabs - Clean pill style for light mode */
     .stTabs [data-baseweb="tab-list"] {
-        background: #111 !important;
-        border: 1px solid #1d1d1f !important;
+        background: #F0F0F0 !important;
+        border: 1px solid #E0E0E0 !important;
         border-radius: 10px !important;
         gap: 4px !important;
         padding: 4px !important;
@@ -13935,7 +13935,7 @@ def main():
     }
     .stTabs [data-baseweb="tab"] {
         background: transparent !important;
-        color: #71717a !important;
+        color: #555555 !important;
         font-size: 13px !important;
         font-weight: 500 !important;
         padding: 10px 20px !important;
@@ -13944,12 +13944,13 @@ def main():
         transition: background-color 0.2s ease, color 0.2s ease !important;
     }
     .stTabs [data-baseweb="tab"]:hover {
-        color: #fff !important;
-        background: rgba(255,255,255,0.06) !important;
+        color: #000000 !important;
+        background: #E8E8E8 !important;
     }
     .stTabs [aria-selected="true"] {
-        background: #000000 !important;
+        background: #FFFFFF !important;
         color: #000000 !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
     }
     .stTabs [aria-selected="true"] p,
     .stTabs [aria-selected="true"] span,
@@ -13959,39 +13960,39 @@ def main():
 
     /* File uploader */
     [data-testid="stFileUploader"] > div {
-        background: #0a0a0a !important;
-        border: 1px dashed #1d1d1f !important;
+        background: #FAFAFA !important;
+        border: 1px dashed #CCCCCC !important;
         border-radius: 10px !important;
         padding: 20px !important;
     }
     [data-testid="stFileUploader"] > div:hover {
-        border-color: #000000 !important;
+        border-color: #999999 !important;
     }
     [data-testid="stFileUploader"] button {
-        background: #000000 !important;
-        color: #000 !important;
-        border: none !important;
+        background: #FFFFFF !important;
+        color: #000000 !important;
+        border: 1px solid #CCCCCC !important;
         border-radius: 6px !important;
         font-weight: 600 !important;
     }
     [data-testid="stFileUploader"] button:hover {
-        background: #333333 !important;
+        background: #F0F0F0 !important;
     }
-    [data-testid="stFileUploader"] small { color: #71717a !important; }
+    [data-testid="stFileUploader"] small { color: #888888 !important; }
 
     /* Text input */
     .stTextInput input {
-        background: #111 !important;
-        border: 1px solid #1d1d1f !important;
+        background: #FFFFFF !important;
+        border: 1px solid #CCCCCC !important;
         border-radius: 8px !important;
-        color: #fff !important;
+        color: #000000 !important;
         padding: 10px 14px !important;
     }
     .stTextInput input:focus {
-        border-color: #000000 !important;
+        border-color: #666666 !important;
         box-shadow: none !important;
     }
-    .stTextInput input::placeholder { color: #71717a !important; }
+    .stTextInput input::placeholder { color: #888888 !important; }
 
     /* Buttons - Consistent sizing for both primary and secondary */
     .stButton > button {
@@ -14008,20 +14009,23 @@ def main():
         opacity: 0.9;
     }
 
-    /* Buttons - Secondary (unselected) - base styles only, colors handled by theme-specific CSS */
+    /* Buttons - Secondary (unselected) */
     .stButton > button[kind="secondary"] {
-        border: 1px solid #333333 !important;
+        background: #F5F5F5 !important;
+        color: #000000 !important;
+        border: 1px solid #CCCCCC !important;
     }
     .stButton > button[kind="secondary"]:hover {
-        border-color: #555 !important;
+        background: #E8E8E8 !important;
+        border-color: #999999 !important;
     }
 
-    /* Form submit button - brand purple, not red */
+    /* Form submit button */
     .stFormSubmitButton > button,
     [data-testid="stFormSubmitButton"] > button,
     button[kind="primaryFormSubmit"] {
         background: #000000 !important;
-        color: #000000 !important;
+        color: #FFFFFF !important;
         border: 1px solid #000000 !important;
         border-radius: 8px !important;
         font-weight: 700 !important;
@@ -14038,12 +14042,12 @@ def main():
     .stFormSubmitButton > button div,
     [data-testid="stFormSubmitButton"] > button p,
     [data-testid="stFormSubmitButton"] > button span {
-        color: #000000 !important;
+        color: #FFFFFF !important;
     }
 
     /* Caption/hint text - make visible */
     .stCaption, [data-testid="stCaptionContainer"], small {
-        color: #a1a1aa !important;
+        color: #888888 !important;
     }
 
     /* Alerts */
@@ -14053,10 +14057,10 @@ def main():
     .stInfo { background: rgba(123,140,222,0.1) !important; border: 1px solid rgba(123,140,222,0.3) !important; border-radius: 8px !important; }
 
     /* Expanders */
-    .stExpander { background: #111 !important; border: 1px solid #1d1d1f !important; border-radius: 8px !important; margin-bottom: 6px !important; }
+    .stExpander { background: #FFFFFF !important; border: 1px solid #E0E0E0 !important; border-radius: 8px !important; margin-bottom: 6px !important; }
 
     /* Progress */
-    .stProgress > div > div { background: #1d1d1f !important; }
+    .stProgress > div > div { background: #E0E0E0 !important; }
     .stProgress > div > div > div { background: #000000 !important; }
 
     /* Range Slider - Clean style (no negative margins) */
@@ -14065,7 +14069,7 @@ def main():
         margin-bottom: 8px !important;
     }
     .stSlider > div > div > div {
-        background: #1d1d1f !important;
+        background: #E0E0E0 !important;
         height: 8px !important;
         border-radius: 4px !important;
     }
@@ -14074,9 +14078,9 @@ def main():
         border-radius: 4px !important;
     }
     .stSlider [data-testid="stThumbValue"] {
-        color: #fff !important;
-        background: #161616 !important;
-        border: 1px solid #000000 !important;
+        color: #000000 !important;
+        background: #FFFFFF !important;
+        border: 1px solid #CCCCCC !important;
         border-radius: 4px !important;
         padding: 2px 6px !important;
         font-size: 11px !important;
@@ -14096,8 +14100,8 @@ def main():
 
     /* Scrollbar */
     ::-webkit-scrollbar { width: 8px; }
-    ::-webkit-scrollbar-track { background: #000; }
-    ::-webkit-scrollbar-thumb { background: #1d1d1f; border-radius: 4px; }
+    ::-webkit-scrollbar-track { background: #F5F5F5; }
+    ::-webkit-scrollbar-thumb { background: #CCCCCC; border-radius: 4px; }
 
     /* ============================================= */
     /* MODE SELECTOR - Purple Pills, Centered       */
@@ -14125,21 +14129,21 @@ def main():
 
     /* The pill container background - centered with border */
     div[data-testid="stRadio"] > div > div[role="radiogroup"] {
-        background: transparent !important;
+        background: #F0F0F0 !important;
         border-radius: 12px !important;
         padding: 4px !important;
         gap: 8px !important;
         display: inline-flex !important;
         justify-content: center !important;
-        border: 1px solid #1d1d1f !important;
+        border: 1px solid #E0E0E0 !important;
         margin: 0 auto !important;
         width: auto !important;
     }
 
-    /* Each radio option (label) - with border */
+    /* Each radio option (label) - pill style */
     div[data-testid="stRadio"] label {
         background: transparent !important;
-        color: #71717a !important;
+        color: #555555 !important;
         font-size: 14px !important;
         font-weight: 500 !important;
         padding: 10px 28px !important;
@@ -14147,22 +14151,22 @@ def main():
         cursor: pointer !important;
         transition: all 0.15s ease !important;
         margin: 0 !important;
-        border: 1px solid #1d1d1f !important;
+        border: none !important;
     }
 
     /* Hover state */
     div[data-testid="stRadio"] label:hover {
-        color: #fff !important;
-        border-color: #000000 !important;
+        color: #000000 !important;
+        background: #E8E8E8 !important;
     }
 
-    /* Selected state - PURPLE background with black text */
+    /* Selected state - white pill with black text */
     div[data-testid="stRadio"] label[data-checked="true"],
     div[data-testid="stRadio"] label:has(input:checked) {
-        background: #000000 !important;
-        color: #000 !important;
+        background: #FFFFFF !important;
+        color: #000000 !important;
         font-weight: 600 !important;
-        border-color: #000000 !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
     }
 
     /* Hide the actual radio circle */
@@ -14175,12 +14179,12 @@ def main():
         display: none !important;
     }
 
-    /* Make sure text in selected is black */
+    /* Make sure text in selected is readable */
     div[data-testid="stRadio"] label[data-checked="true"] span,
     div[data-testid="stRadio"] label[data-checked="true"] p,
     div[data-testid="stRadio"] label:has(input:checked) span,
     div[data-testid="stRadio"] label:has(input:checked) p {
-        color: #000 !important;
+        color: #000000 !important;
     }
 
     /* Remove any red/pink focus outlines */
@@ -14243,12 +14247,12 @@ def main():
         cursor: zoom-in;
         border-radius: 8px;
         transition: transform 0.2s, box-shadow 0.2s;
-        border: 1px solid #1d1d1f;
+        border: 1px solid #E0E0E0;
     }
     .photo-thumbnail:hover {
         transform: scale(1.02);
-        box-shadow: 0 4px 16px rgba(123, 140, 222, 0.3);
-        border-color: #000000;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        border-color: #999999;
     }
 
     /* On-brand icon badges (replacing emojis) */
