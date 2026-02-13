@@ -31,6 +31,13 @@ try:
 except ImportError:
     TIMELINE_X_AVAILABLE = False
 
+# Local Folder Processor (optional - for local file/folder analysis)
+try:
+    from local_folder import LocalFolderProcessor, VideoSorter, PhotoSorter, FolderScanner
+    LOCAL_FOLDER_AVAILABLE = True
+except ImportError:
+    LOCAL_FOLDER_AVAILABLE = False
+
 
 # Google OAuth (optional - for team authentication)
 try:
@@ -9557,16 +9564,19 @@ def display_auto_sort(sort_type="Video"):
         </style>
         """, unsafe_allow_html=True)
 
-        # Dropbox input for photos
-        photo_sort_link = st.text_input(
-            "Dropbox Folder Link",
-            placeholder="Paste Dropbox folder link with photos to sort...",
-            key="photo_sort_dropbox_autosort",
-            label_visibility="collapsed"
-        )
+        # Input tabs for Photo Sort
+        ps_tab_dropbox, ps_tab_local = st.tabs(["Dropbox Link", "Local Path"])
 
-        # Analyze button - always visible
-        analyze_clicked = st.button("Analyze & Preview Sort Order", key="btn_photo_sort_autosort", use_container_width=True, type="primary")
+        with ps_tab_dropbox:
+            photo_sort_link = st.text_input(
+                "Dropbox Folder Link",
+                placeholder="Paste Dropbox folder link with photos to sort...",
+                key="photo_sort_dropbox_autosort",
+                label_visibility="collapsed"
+            )
+
+            # Analyze button - always visible
+            analyze_clicked = st.button("Analyze & Preview Sort Order", key="btn_photo_sort_autosort", use_container_width=True, type="primary")
 
         if analyze_clicked and not photo_sort_link:
             st.warning("Please paste a Dropbox folder link first")
@@ -10061,6 +10071,72 @@ def display_auto_sort(sort_type="Video"):
 
                     st.caption("Click to prepare and download your sorted photos")
 
+        with ps_tab_local:
+            st.markdown(f"""
+            <div style="color: {theme['text_secondary']}; font-size: 13px; margin-bottom: 12px;">
+                Point to a local folder of photos on your Mac. Files will be sorted, renamed, and saved to a <code>_Sorted</code> folder.
+            </div>
+            """, unsafe_allow_html=True)
+
+            ps_local_path = st.text_input(
+                "Local folder path",
+                placeholder="/Users/yourname/Desktop/RAW Photos",
+                key="photo_sort_local_path",
+                label_visibility="collapsed"
+            )
+
+            if ps_local_path:
+                ps_local_path = ps_local_path.strip().strip('"').strip("'")
+
+                if os.path.isdir(ps_local_path):
+                    photo_extensions = {'.jpg', '.jpeg', '.png', '.tiff', '.tif', '.heic', '.raw', '.cr2', '.cr3', '.nef', '.arw', '.dng'}
+                    local_photos = [
+                        f for f in os.listdir(ps_local_path)
+                        if os.path.isfile(os.path.join(ps_local_path, f)) and os.path.splitext(f)[1].lower() in photo_extensions
+                    ]
+                    local_photos.sort()
+
+                    if not local_photos:
+                        st.warning("No photo files found in this folder.")
+                    else:
+                        st.markdown(f"""
+                        <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+                            <span style="color: {theme['text']}; font-weight: 600;">{os.path.basename(ps_local_path)}</span>
+                            <span style="color: {theme['text_muted']}; font-size: 12px; margin-left: 8px;">{len(local_photos)} photos found</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                        if st.button("Sort & Rename Photos", key="btn_photo_sort_local", use_container_width=True, type="primary"):
+                            if LOCAL_FOLDER_AVAILABLE:
+                                with st.spinner("Analyzing and sorting photos..."):
+                                    processor = LocalFolderProcessor()
+                                    result = processor.process_photos(ps_local_path, photo_type="interior")
+
+                                    if result.photos:
+                                        # Create _Sorted output folder
+                                        output_folder = os.path.join(ps_local_path, "_Sorted")
+                                        mapping = processor.export_sorted_photos(output_folder, copy_files=True)
+
+                                        st.success(f"Sorted {len(result.photos)} photos into {output_folder}")
+
+                                        # Show rename preview
+                                        rename_data = []
+                                        for photo in result.photos:
+                                            rename_data.append({
+                                                'Original': photo.original_name,
+                                                'New Name': photo.new_name,
+                                                'Room Type': photo.room_type.replace('_', ' ').title()
+                                            })
+                                        import pandas as pd
+                                        st.dataframe(pd.DataFrame(rename_data), use_container_width=True, hide_index=True)
+                                    else:
+                                        st.warning("No photos could be processed.")
+                            else:
+                                st.error("Local folder processor not available. Check that local_folder.py exists.")
+
+                elif ps_local_path:
+                    st.error("Folder not found. Check the path and try again.")
+
         # Footer with stats
         render_footer()
         return  # End photo sorting mode here
@@ -10446,19 +10522,22 @@ def display_auto_sort(sort_type="Video"):
 
         else:
             # Normal input flow - show when NOT reviewing
-            # Simple Dropbox integration - no authentication needed
-            st.markdown("""
-            <div style="background: rgba(123, 140, 222, 0.1); border: 1px solid rgba(123, 140, 222, 0.3);
-                        border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-                <div style="color: {theme['text']}; font-weight: 600; margin-bottom: 8px;">One-Click Workflow</div>
-                <ol style="color: {theme['text_secondary']}; font-size: 13px; margin: 0; padding-left: 20px;">
-                    <li>Paste your Dropbox folder link</li>
-                    <li>Choose where to save (Desktop, etc.)</li>
-                    <li>Click "Go" - we handle the rest</li>
-                    <li>Open your folder with organized clips + XML</li>
-                </ol>
-            </div>
-            """, unsafe_allow_html=True)
+            vs_tab_dropbox, vs_tab_local = st.tabs(["Dropbox Link", "Local Path"])
+
+            with vs_tab_dropbox:
+                # Simple Dropbox integration - no authentication needed
+                st.markdown("""
+                <div style="background: rgba(123, 140, 222, 0.1); border: 1px solid rgba(123, 140, 222, 0.3);
+                            border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                    <div style="color: {theme['text']}; font-weight: 600; margin-bottom: 8px;">One-Click Workflow</div>
+                    <ol style="color: {theme['text_secondary']}; font-size: 13px; margin: 0; padding-left: 20px;">
+                        <li>Paste your Dropbox folder link</li>
+                        <li>Choose where to save (Desktop, etc.)</li>
+                        <li>Click "Go" - we handle the rest</li>
+                        <li>Open your folder with organized clips + XML</li>
+                    </ol>
+                </div>
+                """, unsafe_allow_html=True)
 
             # Shared link input
             dropbox_link = st.text_input(
@@ -12324,6 +12403,92 @@ def display_auto_sort(sort_type="Video"):
             if 'auto_sort_temp_dir' in st.session_state:
                 del st.session_state.auto_sort_temp_dir
             st.rerun()
+
+    # Video Sort Local Path tab content
+    if sort_mode != "Photos" and not (st.session_state.get('dropbox_clips_for_review') or st.session_state.get('local_clips_for_review')):
+        try:
+            vs_tab_local
+        except NameError:
+            pass
+        else:
+            with vs_tab_local:
+                st.markdown(f"""
+                <div style="color: {theme['text_secondary']}; font-size: 13px; margin-bottom: 12px;">
+                    Point to a local folder of raw video clips on your Mac. Clips will be analyzed, sorted by room type, renamed, and saved to a <code>_Sorted</code> folder with XML timelines.
+                </div>
+                """, unsafe_allow_html=True)
+
+                vs_local_path = st.text_input(
+                    "Local folder path",
+                    placeholder="/Users/yourname/Desktop/RAW Videos",
+                    key="video_sort_local_path",
+                    label_visibility="collapsed"
+                )
+
+                if vs_local_path:
+                    vs_local_path = vs_local_path.strip().strip('"').strip("'")
+
+                    if os.path.isdir(vs_local_path):
+                        video_extensions = {'.mov', '.mp4', '.avi', '.mkv', '.mxf', '.m4v'}
+                        local_vids = [
+                            f for f in os.listdir(vs_local_path)
+                            if os.path.isfile(os.path.join(vs_local_path, f)) and os.path.splitext(f)[1].lower() in video_extensions
+                        ]
+                        local_vids.sort()
+
+                        if not local_vids:
+                            st.warning("No video files found in this folder.")
+                        else:
+                            st.markdown(f"""
+                            <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+                                <span style="color: {theme['text']}; font-weight: 600;">{os.path.basename(vs_local_path)}</span>
+                                <span style="color: {theme['text_muted']}; font-size: 12px; margin-left: 8px;">{len(local_vids)} video clips found</span>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                            vs_export_format = st.selectbox(
+                                "Export format",
+                                ["DaVinci Resolve", "Adobe Premiere Pro", "Final Cut Pro X"],
+                                key="vs_local_export_format"
+                            )
+
+                            if st.button("Sort & Generate XML", key="btn_video_sort_local", use_container_width=True, type="primary"):
+                                if LOCAL_FOLDER_AVAILABLE:
+                                    with st.spinner("Analyzing and sorting video clips..."):
+                                        processor = LocalFolderProcessor()
+                                        result = processor.process_videos(vs_local_path)
+
+                                        if result.clips:
+                                            # Create _Sorted output folder
+                                            output_folder = os.path.join(vs_local_path, "_Sorted")
+                                            mapping = processor.export_sorted_videos(output_folder, copy_files=True)
+
+                                            # Generate XML timelines
+                                            xml_exports = processor.generate_video_xml(output_folder, project_name=os.path.basename(vs_local_path))
+
+                                            st.success(f"Sorted {len(result.clips)} clips into {output_folder}")
+
+                                            # Show rename preview
+                                            rename_data = []
+                                            for clip in result.clips:
+                                                rename_data.append({
+                                                    'Original': clip.original_name,
+                                                    'New Name': clip.new_name,
+                                                    'Scene': clip.scene_type.replace('_', ' ').title(),
+                                                    'Duration': f"{clip.duration:.1f}s" if clip.duration > 0 else "N/A"
+                                                })
+                                            import pandas as pd
+                                            st.dataframe(pd.DataFrame(rename_data), use_container_width=True, hide_index=True)
+
+                                            if xml_exports:
+                                                st.markdown(f"**XML timelines saved to:** `{output_folder}`")
+                                        else:
+                                            st.warning("No video clips could be processed.")
+                                else:
+                                    st.error("Local folder processor not available. Check that local_folder.py exists.")
+
+                    elif vs_local_path:
+                        st.error("Folder not found. Check the path and try again.")
 
     # Footer with stats
     render_footer()
@@ -15293,7 +15458,7 @@ def main():
             </style>
             """, unsafe_allow_html=True)
 
-        video_tab1, video_tab2 = st.tabs(["Dropbox Link", "Upload"])
+        video_tab1, video_tab2, video_tab3 = st.tabs(["Dropbox Link", "Upload", "Local Path"])
 
         with video_tab1:
             video_dropbox = st.text_input(
@@ -15462,6 +15627,62 @@ def main():
 
                 display_video_review_interface(report, tmp_path)
 
+        with video_tab3:
+            st.markdown(f"""
+            <div style="color: {theme['text_secondary']}; font-size: 13px; margin-bottom: 12px;">
+                Paste the full path to a video file on your Mac. No upload needed &mdash; analyzes directly from disk.
+            </div>
+            """, unsafe_allow_html=True)
+
+            video_local_path = st.text_input(
+                "Local file path",
+                placeholder="/Users/yourname/Desktop/video.mp4",
+                key="video_local_path",
+                label_visibility="collapsed"
+            )
+
+            if video_local_path:
+                video_local_path = video_local_path.strip().strip('"').strip("'")
+                if os.path.exists(video_local_path) and os.path.isfile(video_local_path):
+                    ext = os.path.splitext(video_local_path)[1].lower()
+                    if ext in ('.mp4', '.mov', '.avi', '.mkv', '.mxf', '.m4v'):
+                        filename = os.path.basename(video_local_path)
+                        file_size = os.path.getsize(video_local_path) / (1024 * 1024)
+                        st.markdown(f"""
+                        <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+                            <span style="color: {theme['text']}; font-weight: 600;">{filename}</span>
+                            <span style="color: {theme['text_muted']}; font-size: 12px; margin-left: 8px;">{file_size:.1f} MB</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                        if st.button("Analyze", key="btn_video_local", use_container_width=True):
+                            progress_bar = st.progress(0)
+                            status_text = st.empty()
+                            start_time = time.time()
+                            estimated_total = get_total_estimated_time('video')
+
+                            def update_video_progress_local(progress, message):
+                                progress_bar.progress(progress)
+                                elapsed = time.time() - start_time
+                                remaining = (elapsed / progress) - elapsed if progress > 0 else estimated_total
+                                status_text.markdown(render_progress_status(message, remaining), unsafe_allow_html=True)
+
+                            report = run_video_qa(video_local_path, progress_callback=update_video_progress_local, original_filename=filename, analysis_mode=st.session_state.video_analysis_mode)
+                            report.filename = filename
+                            if not report.metadata:
+                                report.metadata = {}
+                            report.metadata['filename'] = filename
+
+                            progress_bar.progress(1.0)
+                            status_text.empty()
+                            progress_bar.empty()
+
+                            display_video_review_interface(report, video_local_path)
+                    else:
+                        st.warning("Please select a video file (MP4, MOV, AVI, MKV, MXF, M4V)")
+                elif video_local_path:
+                    st.error("File not found. Check the path and try again.")
+
     # =============================================
     # PHOTO PROOF
     # =============================================
@@ -15620,7 +15841,7 @@ def main():
             </style>
             """, unsafe_allow_html=True)
 
-        photo_tab1, photo_tab2 = st.tabs(["Dropbox Link", "Upload"])
+        photo_tab1, photo_tab2, photo_tab3 = st.tabs(["Dropbox Link", "Upload", "Local Path"])
 
         with photo_tab1:
             photo_dropbox = st.text_input(
@@ -15830,6 +16051,103 @@ def main():
                 display_report(report)
                 os.unlink(tmp_path)
 
+        with photo_tab3:
+            st.markdown(f"""
+            <div style="color: {theme['text_secondary']}; font-size: 13px; margin-bottom: 12px;">
+                Paste the path to a photo or folder on your Mac. Folders will batch process all images inside.
+            </div>
+            """, unsafe_allow_html=True)
+
+            photo_local_path = st.text_input(
+                "Local file or folder path",
+                placeholder="/Users/yourname/Desktop/photos or /Users/yourname/photo.jpg",
+                key="photo_local_path",
+                label_visibility="collapsed"
+            )
+
+            if photo_local_path:
+                photo_local_path = photo_local_path.strip().strip('"').strip("'")
+
+                if os.path.isfile(photo_local_path):
+                    ext = os.path.splitext(photo_local_path)[1].lower()
+                    if ext in ('.jpg', '.jpeg', '.png', '.tiff', '.tif', '.heic', '.raw', '.cr2', '.cr3', '.nef', '.arw', '.dng'):
+                        filename = os.path.basename(photo_local_path)
+                        file_size = os.path.getsize(photo_local_path) / (1024 * 1024)
+                        st.markdown(f"""
+                        <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+                            <span style="color: {theme['text']}; font-weight: 600;">{filename}</span>
+                            <span style="color: {theme['text_muted']}; font-size: 12px; margin-left: 8px;">{file_size:.1f} MB</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                        if st.button("Analyze", key="btn_photo_local", use_container_width=True):
+                            progress_bar = st.progress(0)
+                            status_text = st.empty()
+                            start_time = time.time()
+                            estimated_total = get_total_estimated_time('photo')
+
+                            def update_photo_progress_local(progress, message):
+                                progress_bar.progress(progress)
+                                elapsed = time.time() - start_time
+                                remaining = (elapsed / progress) - elapsed if progress > 0 else estimated_total
+                                status_text.markdown(render_progress_status(message, remaining), unsafe_allow_html=True)
+
+                            report = run_photo_qa(photo_local_path, progress_callback=update_photo_progress_local, original_filename=filename)
+                            progress_bar.progress(1.0)
+                            status_text.empty()
+                            progress_bar.empty()
+                            display_report(report)
+                    else:
+                        st.warning("Please select an image file (JPG, PNG, TIFF, HEIC, RAW)")
+
+                elif os.path.isdir(photo_local_path):
+                    # Batch process folder
+                    photo_extensions = {'.jpg', '.jpeg', '.png', '.tiff', '.tif', '.heic', '.raw', '.cr2', '.cr3', '.nef', '.arw', '.dng'}
+                    photo_files = [
+                        os.path.join(photo_local_path, f) for f in os.listdir(photo_local_path)
+                        if os.path.isfile(os.path.join(photo_local_path, f)) and os.path.splitext(f)[1].lower() in photo_extensions
+                    ]
+                    photo_files.sort()
+
+                    if not photo_files:
+                        st.warning("No photo files found in this folder.")
+                    else:
+                        st.markdown(f"""
+                        <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+                            <span style="color: {theme['text']}; font-weight: 600;">{os.path.basename(photo_local_path)}</span>
+                            <span style="color: {theme['text_muted']}; font-size: 12px; margin-left: 8px;">{len(photo_files)} photos found</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                        if st.button("Analyze All", key="btn_photo_local_batch", use_container_width=True):
+                            progress_bar = st.progress(0)
+                            status_text = st.empty()
+                            start_time = time.time()
+
+                            for idx, photo_path in enumerate(photo_files):
+                                fname = os.path.basename(photo_path)
+                                progress = (idx + 1) / len(photo_files)
+                                progress_bar.progress(progress)
+                                status_text.markdown(f"""
+                                <div style="color: {theme['text_secondary']}; font-size: 13px;">
+                                    Analyzing {idx + 1}/{len(photo_files)}: {fname}
+                                </div>
+                                """, unsafe_allow_html=True)
+
+                                report = run_photo_qa(photo_path, original_filename=fname)
+                                display_report(report)
+
+                            progress_bar.progress(1.0)
+                            elapsed = time.time() - start_time
+                            status_text.markdown(f"""
+                            <div style="color: #06C167; font-size: 13px;">
+                                Batch complete &mdash; {len(photo_files)} photos analyzed in {int(elapsed//60)}:{int(elapsed%60):02d}
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                elif photo_local_path:
+                    st.error("Path not found. Check the path and try again.")
+
     # =============================================
     # TIMELINE X - AI-Powered Timeline Assembly
     # =============================================
@@ -15921,7 +16239,7 @@ def main():
             st.markdown("---")
 
             # Input tabs
-            tlx_tab1, tlx_tab2 = st.tabs(["Upload", "Dropbox Link"])
+            tlx_tab1, tlx_tab2, tlx_tab3 = st.tabs(["Upload", "Dropbox Link", "Local Path"])
 
             with tlx_tab1:
                 video_clips = st.file_uploader(
@@ -16042,6 +16360,111 @@ def main():
                 if tlx_dropbox:
                     st.info("Dropbox integration for Timeline X coming soon. Please use the Upload tab for now.")
 
+            with tlx_tab3:
+                st.markdown(f"""
+                <div style="color: {theme['text_secondary']}; font-size: 13px; margin-bottom: 12px;">
+                    Point to a local folder of video clips on your Mac. No upload needed &mdash; reads directly from disk.
+                </div>
+                """, unsafe_allow_html=True)
+
+                tlx_local_folder = st.text_input(
+                    "Local folder path",
+                    placeholder="/Users/yourname/Desktop/RAW Videos",
+                    key="tlx_local_folder",
+                    label_visibility="collapsed"
+                )
+
+                tlx_local_music = st.text_input(
+                    "Music file path (optional)",
+                    placeholder="/Users/yourname/Music/track.mp3",
+                    key="tlx_local_music",
+                    label_visibility="collapsed"
+                )
+
+                if tlx_local_folder:
+                    tlx_local_folder = tlx_local_folder.strip().strip('"').strip("'")
+
+                    if os.path.isdir(tlx_local_folder):
+                        video_extensions = {'.mov', '.mp4', '.avi', '.mkv', '.mxf', '.m4v'}
+                        local_clips = [
+                            f for f in os.listdir(tlx_local_folder)
+                            if os.path.isfile(os.path.join(tlx_local_folder, f)) and os.path.splitext(f)[1].lower() in video_extensions
+                        ]
+                        local_clips.sort()
+
+                        if not local_clips:
+                            st.warning("No video files found in this folder.")
+                        else:
+                            st.markdown(f"""
+                            <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+                                <span style="color: {theme['text']}; font-weight: 600;">{os.path.basename(tlx_local_folder)}</span>
+                                <span style="color: {theme['text_muted']}; font-size: 12px; margin-left: 8px;">{len(local_clips)} video clips found</span>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                            # Show clip list
+                            import pandas as pd
+                            clip_data = []
+                            for f in local_clips:
+                                fpath = os.path.join(tlx_local_folder, f)
+                                fsize = os.path.getsize(fpath) / (1024 * 1024)
+                                clip_data.append({'Filename': f, 'Size': f"{fsize:.1f} MB", 'Type': os.path.splitext(f)[1].upper()})
+                            st.dataframe(pd.DataFrame(clip_data), use_container_width=True, hide_index=True)
+
+                            if st.button("Generate Timeline", key="btn_tlx_local_generate", use_container_width=True):
+                                if not TIMELINE_X_AVAILABLE:
+                                    st.error("Timeline X modules not available.")
+                                else:
+                                    with st.spinner("Analyzing clips and assembling timeline..."):
+                                        try:
+                                            tlx = TimelineX()
+                                            tlx.set_format(format_options[selected_format])
+
+                                            # Add clips directly from local paths
+                                            added = tlx.add_clips_from_folder(tlx_local_folder, analyze=True)
+
+                                            # Set music if provided
+                                            if tlx_local_music:
+                                                music_path = tlx_local_music.strip().strip('"').strip("'")
+                                                if os.path.isfile(music_path):
+                                                    manual_bpm_val = manual_bpm if manual_bpm > 0 else None
+                                                    tlx.set_music(music_path, bpm=manual_bpm_val, auto_detect=True)
+
+                                            timeline = tlx.generate_timeline(target_duration=target_duration)
+                                            st.success(f"Timeline generated from {added} clips!")
+
+                                            # Export buttons
+                                            exp_col1, exp_col2, exp_col3 = st.columns(3)
+                                            with exp_col1:
+                                                davinci_path = os.path.join(tlx_local_folder, "timeline_davinci.xml")
+                                                try:
+                                                    xml_content = tlx.export_davinci(davinci_path)
+                                                    with open(davinci_path, 'r') as f:
+                                                        st.download_button("DaVinci Resolve XML", f.read(), "timeline_davinci.xml", "application/xml", key="dl_local_davinci")
+                                                except Exception:
+                                                    st.caption("DaVinci export not available")
+                                            with exp_col2:
+                                                fcpxml_path = os.path.join(tlx_local_folder, "timeline.fcpxml")
+                                                try:
+                                                    xml_content = tlx.export_fcpxml(fcpxml_path)
+                                                    with open(fcpxml_path, 'r') as f:
+                                                        st.download_button("Final Cut Pro FCPXML", f.read(), "timeline.fcpxml", "application/xml", key="dl_local_fcpxml")
+                                                except Exception:
+                                                    st.caption("FCP export not available")
+                                            with exp_col3:
+                                                premiere_path = os.path.join(tlx_local_folder, "timeline_premiere.xml")
+                                                try:
+                                                    xml_content = tlx.export_premiere(premiere_path)
+                                                    with open(premiere_path, 'r') as f:
+                                                        st.download_button("Premiere Pro XML", f.read(), "timeline_premiere.xml", "application/xml", key="dl_local_premiere")
+                                                except Exception:
+                                                    st.caption("Premiere export not available")
+
+                                        except Exception as e:
+                                            st.error(f"Error generating timeline: {str(e)}")
+                    elif tlx_local_folder:
+                        st.error("Folder not found. Check the path and try again.")
+
     # =============================================
     # DIRECTOR X - AI Creative Director Feedback
     # =============================================
@@ -16123,7 +16546,7 @@ def main():
         """, unsafe_allow_html=True)
 
         # Upload section with tabs
-        dx_tab_upload, dx_tab_dropbox = st.tabs(["Upload", "Dropbox Link"])
+        dx_tab_upload, dx_tab_dropbox, dx_tab_local = st.tabs(["Upload", "Dropbox Link", "Local Path"])
 
         dx_video_file = None
         with dx_tab_upload:
@@ -16144,14 +16567,59 @@ def main():
             if dx_dropbox:
                 st.info("Dropbox integration for Director X coming soon. Please use the Upload tab for now.")
 
-        # Process uploaded video
+        dx_local_path = None
+        with dx_tab_local:
+            st.markdown(f"""
+            <div style="color: {theme['text_secondary']}; font-size: 13px; margin-bottom: 12px;">
+                Paste the full path to a video file on your Mac. No upload needed &mdash; analyzes directly from disk.
+            </div>
+            """, unsafe_allow_html=True)
+
+            dx_local_input = st.text_input(
+                "Local file path",
+                placeholder="/Users/yourname/Desktop/edit_v2.mp4",
+                key="dx_local_path",
+                label_visibility="collapsed"
+            )
+
+            if dx_local_input:
+                dx_local_input = dx_local_input.strip().strip('"').strip("'")
+                if os.path.isfile(dx_local_input):
+                    ext = os.path.splitext(dx_local_input)[1].lower()
+                    if ext in ('.mp4', '.mov', '.avi', '.mkv'):
+                        filename = os.path.basename(dx_local_input)
+                        file_size = os.path.getsize(dx_local_input) / (1024 * 1024)
+                        st.markdown(f"""
+                        <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+                            <span style="color: {theme['text']}; font-weight: 600;">{filename}</span>
+                            <span style="color: {theme['text_muted']}; font-size: 12px; margin-left: 8px;">{file_size:.1f} MB</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        dx_local_path = dx_local_input
+                    else:
+                        st.warning("Please select a video file (MP4, MOV, AVI, MKV)")
+                elif dx_local_input:
+                    st.error("File not found. Check the path and try again.")
+
+        # Process uploaded video or local path
+        dx_process_path = None
+        dx_needs_cleanup = False
+
         if dx_video_file is not None:
-            # Save to temp file
+            # Save uploaded file to temp file
             import tempfile
             dx_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{dx_video_file.name.split('.')[-1]}")
             dx_tmp.write(dx_video_file.read())
             dx_tmp_path = dx_tmp.name
             dx_tmp.close()
+            dx_needs_cleanup = True
+
+        elif dx_local_path is not None:
+            # Use local path directly — no temp file needed
+            dx_tmp_path = dx_local_path
+            dx_needs_cleanup = False
+
+        if dx_video_file is not None or dx_local_path is not None:
 
             # Get video metadata with ffprobe
             try:
@@ -16420,11 +16888,12 @@ def main():
                                 except Exception:
                                     pass
 
-            # Cleanup temp video
-            try:
-                os.unlink(dx_tmp_path)
-            except Exception:
-                pass
+            # Cleanup temp video (only if uploaded, not local)
+            if dx_needs_cleanup:
+                try:
+                    os.unlink(dx_tmp_path)
+                except Exception:
+                    pass
 
     # Footer with stats
     render_footer()
