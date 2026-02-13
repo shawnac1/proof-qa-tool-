@@ -14384,7 +14384,7 @@ def main():
         st.markdown(f"""
         <div style="text-align: center; padding: 80px 20px 80px; font-family: 'Poppins', sans-serif;">
             <h1 style="color: {theme['text']}; font-size: 72px; font-weight: 800; margin: 0 0 20px 0; letter-spacing: -3px;">
-                Don't Suck.
+                Your Work Deserves Better.
             </h1>
             <p style="color: {theme['text_secondary']}; font-size: 22px; font-weight: 400; margin: 0; max-width: 700px; line-height: 1.6; display: inline-block;">
                 The smartest, most honest set of eyes and ears you can run your work through before it goes out the door.
@@ -14428,194 +14428,24 @@ def main():
         """, unsafe_allow_html=True)
 
         # =============================================
-        # WHO IT'S FOR
-        # =============================================
-        st.markdown(f"""
-        <div style="max-width: 800px; margin: 0 auto 80px; padding: 0 20px; font-family: 'Poppins', sans-serif; text-align: center;">
-            <p style="color: {theme['text_muted']}; font-size: 12px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; margin: 0 0 12px 0;">Who It's For</p>
-            <h2 style="color: {theme['text']}; font-size: 36px; font-weight: 700; margin: 0 0 40px 0;">
-                Built for Creators Who Give a Damn
-            </h2>
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
-                <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 24px; text-align: center;">
-                    <div style="margin: 0 auto 12px;">{icon_users}</div>
-                    <h4 style="color: {theme['text']}; font-size: 15px; font-weight: 600; margin: 0 0 8px;">Production Teams</h4>
-                    <p style="color: {theme['text_secondary']}; font-size: 13px; line-height: 1.5; margin: 0;">
-                        QC 50 deliverables a week without eyeballing every one
-                    </p>
-                </div>
-                <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 24px; text-align: center;">
-                    <div style="margin: 0 auto 12px;">{icon_target}</div>
-                    <h4 style="color: {theme['text']}; font-size: 15px; font-weight: 600; margin: 0 0 8px;">Solo Creators</h4>
-                    <p style="color: {theme['text_secondary']}; font-size: 13px; line-height: 1.5; margin: 0;">
-                        Get a creative director looking over your shoulder
-                    </p>
-                </div>
-                <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 24px; text-align: center;">
-                    <div style="margin: 0 auto 12px;">{icon_eye}</div>
-                    <h4 style="color: {theme['text']}; font-size: 15px; font-weight: 600; margin: 0 0 8px;">Professionals</h4>
-                    <p style="color: {theme['text_secondary']}; font-size: 13px; line-height: 1.5; margin: 0;">
-                        Make good work undeniable with a second opinion
-                    </p>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # =============================================
-        # VALUE PROPS (3 cards)
-        # =============================================
-        st.markdown(f"""
-        <div style="max-width: 800px; margin: 0 auto 80px; padding: 0 20px; font-family: 'Poppins', sans-serif;">
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
-                <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 24px; text-align: center;">
-                    <div style="margin: 0 auto 12px;">{icon_clock}</div>
-                    <h4 style="color: {theme['text']}; font-size: 15px; font-weight: 600; margin: 0 0 8px;">Save Time</h4>
-                    <p style="color: {theme['text_secondary']}; font-size: 13px; line-height: 1.5; margin: 0;">
-                        Automate tedious QA checks that used to take hours
-                    </p>
-                </div>
-                <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 24px; text-align: center;">
-                    <div style="margin: 0 auto 12px;">{icon_rocket}</div>
-                    <h4 style="color: {theme['text']}; font-size: 15px; font-weight: 600; margin: 0 0 8px;">Speed Up Workflow</h4>
-                    <p style="color: {theme['text_secondary']}; font-size: 13px; line-height: 1.5; margin: 0;">
-                        From raw footage to delivery-ready in minutes
-                    </p>
-                </div>
-                <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 24px; text-align: center;">
-                    <div style="margin: 0 auto 12px;">{icon_sparkle}</div>
-                    <h4 style="color: {theme['text']}; font-size: 15px; font-weight: 600; margin: 0 0 8px;">Elevate Quality</h4>
-                    <p style="color: {theme['text_secondary']}; font-size: 13px; line-height: 1.5; margin: 0;">
-                        Catch issues before your clients do
-                    </p>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # =============================================
-        # WHERE WE'RE STARTING - Real Estate
-        # =============================================
-        st.markdown(f"""
-        <div style="background: {theme['card']}; border-top: 1px solid {theme['border']}; border-bottom: 1px solid {theme['border']}; padding: 80px 20px; margin-bottom: 80px; font-family: 'Poppins', sans-serif;">
-            <div style="max-width: 900px; margin: 0 auto; text-align: center;">
-                <p style="color: {theme['text_muted']}; font-size: 12px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; margin: 0 0 12px 0;">Where We're Starting</p>
-                <h2 style="color: {theme['text']}; font-size: 36px; font-weight: 700; margin: 0 0 40px 0;">
-                    Real Estate Media
-                </h2>
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;">
-                    <div style="background: {theme['bg']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 24px; text-align: center;">
-                        <div style="margin: 0 auto 12px;">{icon_video}</div>
-                        <h4 style="color: {theme['text']}; font-size: 15px; font-weight: 600; margin: 0 0 8px;">Video QA</h4>
-                        <p style="color: {theme['text_secondary']}; font-size: 13px; line-height: 1.5; margin: 0;">
-                            Resolution, audio, color grading, and 20+ checks
-                        </p>
-                    </div>
-                    <div style="background: {theme['bg']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 24px; text-align: center;">
-                        <div style="margin: 0 auto 12px;">{icon_camera}</div>
-                        <h4 style="color: {theme['text']}; font-size: 15px; font-weight: 600; margin: 0 0 8px;">Photo QA</h4>
-                        <p style="color: {theme['text_secondary']}; font-size: 13px; line-height: 1.5; margin: 0;">
-                            Exposure, white balance, sharpness, and more
-                        </p>
-                    </div>
-                    <div style="background: {theme['bg']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 24px; text-align: center;">
-                        <div style="margin: 0 auto 12px;">{icon_house}</div>
-                        <h4 style="color: {theme['text']}; font-size: 15px; font-weight: 600; margin: 0 0 8px;">Room Detection</h4>
-                        <p style="color: {theme['text_secondary']}; font-size: 13px; line-height: 1.5; margin: 0;">
-                            AI identifies 40+ room types automatically
-                        </p>
-                    </div>
-                    <div style="background: {theme['bg']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 24px; text-align: center;">
-                        <div style="margin: 0 auto 12px;">{icon_folder}</div>
-                        <h4 style="color: {theme['text']}; font-size: 15px; font-weight: 600; margin: 0 0 8px;">Auto Sort</h4>
-                        <p style="color: {theme['text_secondary']}; font-size: 13px; line-height: 1.5; margin: 0;">
-                            Organize and rename in delivery order
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # =============================================
-        # WHERE WE'RE GOING - Full Creative Director
-        # =============================================
-        st.markdown(f"""
-        <div style="max-width: 900px; margin: 0 auto 80px; padding: 0 20px; font-family: 'Poppins', sans-serif; text-align: center;">
-            <p style="color: {theme['text_muted']}; font-size: 12px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; margin: 0 0 12px 0;">Where We're Going</p>
-            <h2 style="color: {theme['text']}; font-size: 36px; font-weight: 700; margin: 0 0 16px 0;">
-                The Full Creative Director
-            </h2>
-            <p style="color: {theme['text_secondary']}; font-size: 16px; max-width: 700px; margin: 0 auto 40px;">
-                Real estate is the launchpad. The long-term vision is for Proof to be the quality control layer for all visual and audio media across every genre and format.
-            </p>
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; text-align: center;">
-                <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 24px; text-align: center;">
-                    <div style="margin: 0 auto 12px;">{icon_layers}</div>
-                    <span style="color: {theme['text_muted']}; font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;">Coming Soon</span>
-                    <h4 style="color: {theme['text']}; font-size: 15px; font-weight: 600; margin: 8px 0;">Color Grading Analysis</h4>
-                    <p style="color: {theme['text_secondary']}; font-size: 13px; line-height: 1.5; margin: 0;">
-                        Skin tone evaluation, grade consistency, contrast ratios
-                    </p>
-                </div>
-                <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 24px; text-align: center;">
-                    <div style="margin: 0 auto 12px;">{icon_compass}</div>
-                    <span style="color: {theme['text_muted']}; font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;">Coming Soon</span>
-                    <h4 style="color: {theme['text']}; font-size: 15px; font-weight: 600; margin: 8px 0;">Storytelling Analysis</h4>
-                    <p style="color: {theme['text_secondary']}; font-size: 13px; line-height: 1.5; margin: 0;">
-                        Pacing, emotional arc, edit rhythm, opening hooks
-                    </p>
-                </div>
-                <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 24px; text-align: center;">
-                    <div style="margin: 0 auto 12px;">{icon_zap}</div>
-                    <span style="color: {theme['text_muted']}; font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;">Coming Soon</span>
-                    <h4 style="color: {theme['text']}; font-size: 15px; font-weight: 600; margin: 8px 0;">Sound Design</h4>
-                    <p style="color: {theme['text_secondary']}; font-size: 13px; line-height: 1.5; margin: 0;">
-                        Music-visual matching, sound effects, audio transitions
-                    </p>
-                </div>
-                <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 24px; text-align: center;">
-                    <div style="margin: 0 auto 12px;">{icon_camera}</div>
-                    <span style="color: {theme['text_muted']}; font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;">Coming Soon</span>
-                    <h4 style="color: {theme['text']}; font-size: 15px; font-weight: 600; margin: 8px 0;">Portrait Photography</h4>
-                    <p style="color: {theme['text_secondary']}; font-size: 13px; line-height: 1.5; margin: 0;">
-                        Lighting quality, eye focus, background analysis
-                    </p>
-                </div>
-                <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 24px; text-align: center;">
-                    <div style="margin: 0 auto 12px;">{icon_target}</div>
-                    <span style="color: {theme['text_muted']}; font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;">Coming Soon</span>
-                    <h4 style="color: {theme['text']}; font-size: 15px; font-weight: 600; margin: 8px 0;">Product Photography</h4>
-                    <p style="color: {theme['text_secondary']}; font-size: 13px; line-height: 1.5; margin: 0;">
-                        Lighting consistency, shadow quality, color accuracy
-                    </p>
-                </div>
-                <div style="background: {theme['card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 24px; text-align: center;">
-                    <div style="margin: 0 auto 12px;">{icon_eye}</div>
-                    <span style="color: {theme['text_muted']}; font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;">Coming Soon</span>
-                    <h4 style="color: {theme['text']}; font-size: 15px; font-weight: 600; margin: 8px 0;">Cross-Element Synthesis</h4>
-                    <p style="color: {theme['text_secondary']}; font-size: 13px; line-height: 1.5; margin: 0;">
-                        How color, sound, pacing work together
-                    </p>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # =============================================
         # BOTTOM CTA
         # =============================================
         st.markdown(f"""
-        <div style="text-align: center; padding: 60px 20px 80px; font-family: 'Poppins', sans-serif;">
-            <h2 style="color: {theme['text']}; font-size: 32px; font-weight: 700; margin: 0 0 16px 0;">
-                Ready to stop sucking?
+        <div style="text-align: center; padding: 80px 20px 80px; font-family: 'Poppins', sans-serif;">
+            <h2 style="color: {theme['text']}; font-size: 42px; font-weight: 800; margin: 0 0 16px 0; letter-spacing: -1px;">
+                Ready to Stop Sucking?
             </h2>
-            <p style="color: {theme['text_secondary']}; font-size: 16px; margin: 0 0 30px 0;">
-                Quality should be the baseline, not the exception.
+            <p style="color: {theme['text_secondary']}; font-size: 17px; margin: 0 0 40px 0; max-width: 500px; display: inline-block; line-height: 1.6;">
+                Run your work through Proof. See what passes, what doesn't, and exactly how to fix it.
             </p>
-            <a href="?page=video" target="_self" style="display: inline-block; background: {theme['text']}; color: {theme['bg']}; padding: 18px 48px; border-radius: 8px; font-weight: 600; font-size: 17px; text-decoration: none;">
-                Get Started
-            </a>
+            <div>
+                <a href="?page=photo" target="_parent" style="display: inline-block; background: {theme['text']}; color: {theme['bg']}; padding: 18px 48px; border-radius: 8px; font-weight: 600; font-size: 17px; text-decoration: none; margin-right: 12px;">
+                    Test Your Photos
+                </a>
+                <a href="?page=video" target="_parent" style="display: inline-block; background: transparent; color: {theme['text']}; padding: 18px 48px; border-radius: 8px; font-weight: 600; font-size: 17px; text-decoration: none; border: 2px solid {theme['border']};">
+                    Test Your Videos
+                </a>
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
