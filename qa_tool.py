@@ -1,6 +1,6 @@
 """
-Proof by Aerial Canvas - Beta
-Automated quality assurance for video and photo deliverables
+Proof by Shawn Hernandez - Beta
+Automated quality assurance for photo and video deliverables
 """
 
 import streamlit as st
@@ -2226,7 +2226,7 @@ def render_footer():
             <div class="proof-footer-stat-label">Time Saved</div>
         </div>
         <div class="proof-footer-brand">
-            Proof by Aerial Canvas · Beta v2.8
+            Proof by Shawn Hernandez · Beta v2.8
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -2355,17 +2355,15 @@ def show_login_page():
     if logo_b64:
         st.markdown(f"""
         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 40vh; text-align: center; padding-top: 60px;">
-            <img src="data:image/png;base64,{logo_b64}" style="height: 160px; margin-bottom: 24px; filter: invert(1);">
-            <p style="color: #a1a1aa; font-size: 16px; margin-bottom: 12px; font-weight: 500;">by Aerial Canvas</p>
-            <p style="color: #000000; font-size: 20px; margin-bottom: 32px;">Automated QA for Video and Photo Deliverables</p>
+            <img src="data:image/png;base64,{logo_b64}" style="height: 240px; margin-bottom: 24px; filter: invert(1);">
+            <p style="color: #71717a; font-size: 20px; margin-bottom: 32px;">Automated QA for Photo &amp; Video Deliverables</p>
         </div>
         """, unsafe_allow_html=True)
     else:
         st.markdown("""
         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 40vh; text-align: center; padding-top: 60px;">
-            <h1 style="font-size: 96px; color: #000000 !important; margin-bottom: 16px;">Proof</h1>
-            <p style="color: #a1a1aa; font-size: 16px; margin-bottom: 12px; font-weight: 500;">by Aerial Canvas</p>
-            <p style="color: #000000; font-size: 20px; margin-bottom: 32px;">Automated QA for Video and Photo Deliverables</p>
+            <h1 style="font-size: 144px; color: #000000 !important; margin-bottom: 16px;">Proof</h1>
+            <p style="color: #71717a; font-size: 20px; margin-bottom: 32px;">Automated QA for Photo &amp; Video Deliverables</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -2499,9 +2497,9 @@ def show_waitlist_page(user_info: dict):
     st.markdown(f"""
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; text-align: center;">
         <h1 style="font-size: 36px; color: #000000 !important; margin-bottom: 16px;">You're on the list!</h1>
-        <p style="color: #71717a; font-size: 16px; margin-bottom: 8px;">Thanks for your interest in Proof by Aerial Canvas.</p>
+        <p style="color: #71717a; font-size: 16px; margin-bottom: 8px;">Thanks for your interest in Proof by Shawn Hernandez.</p>
         <p style="color: #71717a; font-size: 14px; margin-bottom: 32px;">
-            We're currently in private beta with the Aerial Canvas team.<br>
+            We're currently in private beta.<br>
             We'll notify you at <span style="color: #000000; font-weight: 600;">{email}</span> when we open up access.
         </p>
     </div>
@@ -14353,7 +14351,7 @@ def main():
         accent_bg = 'rgba(123, 140, 222, 0.08)' if theme['bg'] == '#FFFFFF' else 'rgba(123, 140, 222, 0.15)'
         st.markdown(f"""
         <div style="background: {accent_bg}; border: 1px solid rgba(123, 140, 222, 0.15); border-radius: 12px; padding: 24px; text-align: center; max-width: 800px; margin-left: auto; margin-right: auto;">
-            <p style="color: {text_primary}; font-size: 16px; font-weight: 600; margin: 0 0 4px 0;">Proof by Aerial Canvas</p>
+            <p style="color: {text_primary}; font-size: 16px; font-weight: 600; margin: 0 0 4px 0;">Proof by Shawn Hernandez</p>
             <p style="color: {text_muted}; font-size: 12px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; margin: 0;">Consistency · Speed · Quality</p>
         </div>
         """, unsafe_allow_html=True)
